@@ -9,7 +9,9 @@
 #include "esp_log.h"
 #include "driver/gpio.h"
 #include "driver/spi_master.h"
-
+#include "esp_chip_info.h"
+#include "esp_http_server.h"
+#include "cJSON.h"
 
 #define ENC_MOSI_PIN GPIO_NUM_13
 #define ENC_MISO_PIN GPIO_NUM_12
@@ -26,9 +28,12 @@
 #define BUZZER_PIN GPIO_NUM_22
 
 static const char *TAG = "SWH_eth_test";
+static const char *HTTP_TAG = "SWH_HTTP_TEST";
 
 void rgbConfig(void);  // rgb led configuration
 void setRGBLED(uint8_t , uint8_t , uint8_t);  // setting individual leds
+esp_err_t start_rest_server(void);
+static esp_err_t hello_world_handler(httpd_req_t *req);
 
 /** Event handler for Ethernet events */
 static void eth_event_handler(void *arg, esp_event_base_t event_base,
@@ -40,6 +45,7 @@ static void eth_event_handler(void *arg, esp_event_base_t event_base,
 
     switch (event_id) {
     case ETHERNET_EVENT_CONNECTED:
+        setRGBLED(1 , 1 , 0);
         esp_eth_ioctl(eth_handle, ETH_CMD_G_MAC_ADDR, mac_addr);
         ESP_LOGI(TAG, "Ethernet Link Up");
         ESP_LOGI(TAG, "Ethernet HW Addr %02x:%02x:%02x:%02x:%02x:%02x",
@@ -51,7 +57,7 @@ static void eth_event_handler(void *arg, esp_event_base_t event_base,
         break;
     case ETHERNET_EVENT_START:
         ESP_LOGI(TAG, "Ethernet Started");
-        setRGBLED(1 , 1 , 0);
+        //setRGBLED(1 , 1 , 0);
         break;
     case ETHERNET_EVENT_STOP:
         ESP_LOGI(TAG, "Ethernet Stopped");
@@ -75,11 +81,16 @@ static void got_ip_event_handler(void *arg, esp_event_base_t event_base,
     ESP_LOGI(TAG, "ETHGW:" IPSTR, IP2STR(&ip_info->gw));
     ESP_LOGI(TAG, "~~~~~~~~~~~");
     setRGBLED(1 , 0 , 1);
+
+    start_rest_server();
 }
 
 void app_main(void)
 {
+    
     rgbConfig(); // configuring rgb leds
+    setRGBLED(0 , 1 , 1); // set Red led by default in beginning
+
 
     ESP_ERROR_CHECK(gpio_install_isr_service(0));
     // Initialize TCP/IP network interface (should be called only once in application)
@@ -152,18 +163,14 @@ void app_main(void)
 }
 void rgbConfig(void)
 {
-    // resetting all the rgb leds 
-    gpio_reset_pin(RED_LED_PIN);
-    gpio_reset_pin(GREEN_LED_PIN);
-    gpio_reset_pin(BLUE_LED_PIN);
-    gpio_reset_pin(BUZZER_PIN);
     // setting gpio mode of the rgb pins
     gpio_set_direction(RED_LED_PIN , GPIO_MODE_OUTPUT);
     gpio_set_direction(GREEN_LED_PIN , GPIO_MODE_OUTPUT);
     gpio_set_direction(BLUE_LED_PIN , GPIO_MODE_OUTPUT);
-    gpio_set_direction(BUZZER_PIN , GPIO_MODE_OUTPUT);
 
-    gpio_set_level(RED_LED_PIN , 0);   // set red led by default
+    gpio_set_level(RED_LED_PIN , 1);   
+    gpio_set_level(GREEN_LED_PIN , 1); 
+    gpio_set_level(BLUE_LED_PIN , 1); 
 
 
 }
@@ -171,11 +178,69 @@ void rgbConfig(void)
 void setRGBLED(uint8_t red , uint8_t green , uint8_t blue)
 { 
     gpio_set_level(RED_LED_PIN , red);
-    gpio_set_level(RED_LED_PIN , green);
-    gpio_set_level(RED_LED_PIN , blue);
+    gpio_set_level(GREEN_LED_PIN , green);
+    gpio_set_level(BLUE_LED_PIN , blue);
 
 
+}
+esp_err_t start_rest_server(void)
+{
+    httpd_handle_t server = NULL;
+    httpd_config_t config = HTTPD_DEFAULT_CONFIG();
+    config.uri_match_fn = httpd_uri_match_wildcard;
+
+    ESP_LOGI(HTTP_TAG, "Starting HTTP Server");
+    ESP_ERROR_CHECK(httpd_start(&server, &config));
+
+    /* URI handler for fetching system info */
+    httpd_uri_t hello_world_get_uri = {
+        .uri = "/hello",
+        .method = HTTP_GET,
+        .handler = hello_world_handler,
+        .user_ctx = NULL
+    };
+    httpd_register_uri_handler(server, &hello_world_get_uri);
+    return ESP_OK;
+}
 
 
+    /* URI handler for fetching temperature data */
+//     httpd_uri_t temperature_data_get_uri = {
+//         .uri = "/api/v1/temp/raw",
+//         .method = HTTP_GET,
+//         .handler = temperature_data_get_handler,
+//         .user_ctx = rest_context
+//     };
+//     httpd_register_uri_handler(server, &temperature_data_get_uri);
 
+//     /* URI handler for light brightness control */
+//     httpd_uri_t light_brightness_post_uri = {
+//         .uri = "/api/v1/light/brightness",
+//         .method = HTTP_POST,
+//         .handler = light_brightness_post_handler,
+//         .user_ctx = rest_context
+//     };
+//     httpd_register_uri_handler(server, &light_brightness_post_uri);
+
+//     /* URI handler for getting web server files */
+//     httpd_uri_t common_get_uri = {
+//         .uri = "/*",
+//         .method = HTTP_GET,
+//         .handler = rest_common_get_handler,
+//         .user_ctx = rest_context
+//     };
+//     httpd_register_uri_handler(server, &common_get_uri);
+// err_start:
+//     free(rest_context);
+// err:
+//     return ESP_FAIL;
+
+static esp_err_t hello_world_handler(httpd_req_t *req)
+{
+    httpd_resp_set_status(req , HTTPD_200);
+    httpd_resp_set_type(req , "application/json");
+
+    httpd_resp_sendstr(req , "{\"data\":hello_world\"}");
+
+    return ESP_OK;
 }
