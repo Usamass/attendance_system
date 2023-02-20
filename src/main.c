@@ -15,18 +15,20 @@
 #include "SWH_RGB.h"
 
 static const char *ETH_TAG = "SWH_eth_test";
-//static const char *HTTP_TAG = "SWH_HTTP_TEST";
+static const char *HTTP_SERVER_TAG = "SWH_HTTP_TEST";
 
-// esp_err_t start_rest_server(void);
-// static esp_err_t hello_world_handler(httpd_req_t *req);
+void server_initiation();
 
 #define ENC_MOSI_PIN GPIO_NUM_13
 #define ENC_MISO_PIN GPIO_NUM_12
 #define ENC_CLK_PIN  GPIO_NUM_14
 #define ENC_CS_PIN   GPIO_NUM_15
 #define ENC_INT_PIN  GPIO_NUM_4
+#define BUZZER_PIN GPIO_NUM_22
 #define ENC_SPI_CLOCK_MHZ (8)
 #define CONFIG_ENC28J60_DUPLEX_FULL
+#define HTTP_QUERY_KEY_MAX_LEN  (64)
+
 
 #define ENC_SPI_HOST SPI2_HOST
 
@@ -76,8 +78,7 @@ static void got_ip_event_handler(void *arg, esp_event_base_t event_base,
     ESP_LOGI(ETH_TAG, "ETHGW:" IPSTR, IP2STR(&ip_info->gw));
     ESP_LOGI(ETH_TAG, "~~~~~~~~~~~");
     setRGBLED(1 , 0 , 1);
-
-    //start_rest_server();
+    server_initiation();
 }
 
 void app_main(void)
@@ -85,8 +86,10 @@ void app_main(void)
     
     rgbConfig(); // configuring rgb leds
     setRGBLED(0 , 1 , 1); // set Red led by default in beginning
+    gpio_reset_pin(BUZZER_PIN); // resetting buzzer pin
+    gpio_set_direction(BUZZER_PIN , GPIO_MODE_OUTPUT);  // setting buzzer pin as an output
 
-
+// <--------------------------------------------------------- Ethernet hardware Configs-------------------------------------------------->
     ESP_ERROR_CHECK(gpio_install_isr_service(0));
     // Initialize TCP/IP network interface (should be called only once in application)
     ESP_ERROR_CHECK(esp_netif_init());
@@ -154,6 +157,186 @@ void app_main(void)
     /* start Ethernet driver state machine */
     ESP_ERROR_CHECK(esp_eth_start(eth_handle));
 }
+// <----------------------------------------------- Handler function for http uri's------------------------------------------------------------------------->
 
+static esp_err_t led_color_handler(httpd_req_t *req)
+{
+    char* buff;
+    size_t buff_len;
+    uint8_t red = 1;
+    uint8_t green = 1;
+    uint8_t blue = 1;
+
+
+
+    buff_len = httpd_req_get_url_query_len(req) +1;
+    if (buff_len > 1){
+        buff = malloc(buff_len);
+        if (httpd_req_get_url_query_str(req , buff , buff_len) == ESP_OK){
+            ESP_LOGI(HTTP_SERVER_TAG , "Found URL query => %s" , buff);
+            char param[HTTP_QUERY_KEY_MAX_LEN]; /*dec_param[EXAMPLE_HTTP_QUERY_KEY_MAX_LEN] = {0};*/
+            // Get value of expected key from query string 
+
+            if (httpd_query_key_value(buff , "red" , param , sizeof(param)) == ESP_OK){
+                red = param[0] - '0';
+
+                ESP_LOGI(HTTP_SERVER_TAG , "Found URL first query parameter => red parameter=%s \t red val=%d" , param , red);
+                
+            }
+            if (httpd_query_key_value(buff , "green" , param , sizeof(param)) == ESP_OK){
+                green = param[0]- '0';
+                ESP_LOGI(HTTP_SERVER_TAG , "Found URL first query parameter => green parameter=%s \t green val=%d" , param , green);
+
+                
+            }
+            if (httpd_query_key_value(buff , "blue" , param , sizeof(param)) == ESP_OK){
+                blue = param[0]- '0';
+                ESP_LOGI(HTTP_SERVER_TAG , "Found URL first query parameter => blue parameter=%s \t blue val=%d" , param , blue);
+
+                
+            }
+
+
+        }
+        if (red == 0){
+            const char* resp = "red led turned on!";
+            httpd_resp_send(req , resp , HTTPD_RESP_USE_STRLEN);
+        }
+        else if(green == 0){
+            const char* resp = "green led turned on!";
+            httpd_resp_send(req , resp , HTTPD_RESP_USE_STRLEN);
+
+        }
+        else if(blue == 0){
+            const char* resp = "blue led turned on!";
+            httpd_resp_send(req , resp , HTTPD_RESP_USE_STRLEN);
+
+        }
+        else{
+            const char* resp = "leds turned off!";
+            httpd_resp_send(req , resp , HTTPD_RESP_USE_STRLEN);
+
+
+        }
+        setRGBLED(red , green , blue);
+
+    }
+
+
+  
+    return ESP_OK;
+}
+
+static esp_err_t off_handler(httpd_req_t *req)
+{
+    setRGBLED(1 , 1 , 1);
+    httpd_resp_set_type(req , "application/json");
+    const char *post_data = "{\"name\":\"osama_shafique\"}";    
+    httpd_resp_send(req, post_data, HTTPD_RESP_USE_STRLEN);
+    
+    return ESP_OK;
+}
+static esp_err_t buzzer_on(httpd_req_t *req)
+{
+    gpio_set_level(BUZZER_PIN , 1);
+    const char* resp = "Buzzer turned on!";
+    httpd_resp_send(req , resp , HTTPD_RESP_USE_STRLEN);
+
+    return ESP_OK;    
+
+}
+static esp_err_t buzzer_off(httpd_req_t *req)
+{
+    gpio_set_level(BUZZER_PIN , 0);
+    const char* resp = "Buzzer turned off!";
+    httpd_resp_send(req , resp , HTTPD_RESP_USE_STRLEN);
+    
+    return ESP_OK;    
+
+
+}
+static esp_err_t get_system_info(httpd_req_t* req)
+{
+    httpd_resp_set_type(req , "application/json");  // setting content type of the response
+
+    cJSON* root = cJSON_CreateObject(); // creating a json object
+    // getting esp chip info
+    esp_chip_info_t myChipInfo;
+    esp_chip_info(&myChipInfo);
+    // adding element to json object
+    cJSON_AddStringToObject(root , "version" , IDF_VER);
+    cJSON_AddNumberToObject(root , "cores" , myChipInfo.cores);
+    // parsing it to string
+    const char* jsonString = cJSON_Print(root);
+    // sending the jsonString as a response
+    httpd_resp_sendstr(req , jsonString);
+
+    free((void*)jsonString);
+
+    return ESP_OK;    
+
+}
+
+//<---------------------------------------------- Server initialization with default configuration-------------------------------------------------------------->
+
+void server_initiation()
+{
+    httpd_config_t server_config = HTTPD_DEFAULT_CONFIG();
+    httpd_handle_t server_handle = NULL;
+    ESP_LOGI(HTTP_SERVER_TAG, "Starting server on port: '%d'", server_config.server_port);
+
+    if (httpd_start(&server_handle, &server_config) == ESP_OK){
+        httpd_uri_t uri_led_color = {
+            .uri = "/led",
+            .method = HTTP_GET,
+            .handler = led_color_handler,
+            .user_ctx = NULL
+        };
+
+        httpd_register_uri_handler(server_handle, &uri_led_color);
+
+        httpd_uri_t uri_off = {
+        .uri = "/off",
+        .method = HTTP_GET,
+        .handler = off_handler,
+        .user_ctx = NULL
+        };
+
+        httpd_register_uri_handler(server_handle, &uri_off);
+
+
+        httpd_uri_t uri_buzzer_on = {
+            .uri = "/buzzer/on",
+            .method = HTTP_GET,
+            .handler = buzzer_on,
+            .user_ctx = NULL
+        };
+
+        httpd_register_uri_handler(server_handle , &uri_buzzer_on);
+
+
+        httpd_uri_t uri_buzzer_off = {
+            .uri = "/buzzer/off",
+            .method = HTTP_GET,
+            .handler = buzzer_off,
+            .user_ctx = NULL
+        };
+
+        httpd_register_uri_handler(server_handle , &uri_buzzer_off);
+
+        httpd_uri_t uri_system_info = {
+            .uri = "/GetSystemInfo",
+            .method = HTTP_GET,
+            .handler = get_system_info,
+            .user_ctx = NULL
+        };
+
+        httpd_register_uri_handler(server_handle , &uri_system_info);
+    }
+    else{
+        ESP_LOGI(HTTP_SERVER_TAG, "Error starting server!");
+    }
+
+}
 
 
