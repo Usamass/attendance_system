@@ -18,6 +18,7 @@ static const char *ETH_TAG = "SWH_eth_test";
 static const char *HTTP_SERVER_TAG = "SWH_HTTP_TEST";
 
 void server_initiation();
+int MIN(int , int);
 
 #define ENC_MOSI_PIN GPIO_NUM_13
 #define ENC_MISO_PIN GPIO_NUM_12
@@ -276,6 +277,32 @@ static esp_err_t get_system_info(httpd_req_t* req)
     return ESP_OK;    
 
 }
+static esp_err_t get_post_data(httpd_req_t* req)
+{
+    const int buff_len = 100;
+    char buff[100];
+    int ret;
+    // getting content length of the request.
+    int remaining = req->content_len;
+
+    while (remaining > 0){
+        if ((ret = httpd_req_recv(req , buff , MIN(remaining , buff_len))) <= 0){
+            if (ret == HTTPD_SOCK_ERR_TIMEOUT){
+                continue;
+            }
+            return ESP_FAIL;
+        }
+    }
+    buff[buff_len] = '\0';
+
+    ESP_LOGI(HTTP_SERVER_TAG , "-----RECEIVED DATA------\n");
+    ESP_LOGI(HTTP_SERVER_TAG , "http data :%s \n ", buff);
+    ESP_LOGI(HTTP_SERVER_TAG , "--------------------------\n");
+
+    httpd_resp_send(req , buff , buff_len);
+    return ESP_OK;
+
+}
 
 //<---------------------------------------------- Server initialization with default configuration-------------------------------------------------------------->
 
@@ -332,11 +359,38 @@ void server_initiation()
         };
 
         httpd_register_uri_handler(server_handle , &uri_system_info);
+
+        httpd_uri_t uri_get_data = {
+            .uri = "/GetData",
+            .method = HTTP_POST,
+            .handler = get_post_data,
+            .user_ctx = NULL
+
+        };
+        
+        httpd_register_uri_handler(server_handle , &uri_get_data);
+
+        // httpd_uri_t uri_put_hander = {
+        //     .uri = "/data",
+        //     .method = HTTP_PUT,
+        //     .handler = http_put_handler,
+        //     .user_ctx = NULL
+        // };
+        // httpd_register_uri_handler(server_handle , &uri_put_hander);
+
+
     }
     else{
         ESP_LOGI(HTTP_SERVER_TAG, "Error starting server!");
     }
 
 }
+int MIN(int buff_1 , int buff_2)
+{
+    if ((buff_1 - buff_2) <= 0)
+    return buff_1;
+    else 
+    return buff_2;
 
+}
 
