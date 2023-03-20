@@ -1,0 +1,14 @@
+#define ENC_MOSI_PIN GPIO_NUM_13
+#define ENC_MISO_PIN GPIO_NUM_12
+#define ENC_CLK_PIN  GPIO_NUM_14
+#define ENC_CS_PIN   GPIO_NUM_15
+#define ENC_INT_PIN  GPIO_NUM_4
+#define BUZZER_PIN GPIO_NUM_22
+#define ENC_SPI_CLOCK_MHZ (8)
+#define CONFIG_ENC28J60_DUPLEX_FULL
+#define HTTP_QUERY_KEY_MAX_LEN  (64)
+
+
+#define ENC_SPI_HOST SPI2_HOST
+
+void swh_eth_init();

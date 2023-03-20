@@ -1,6 +1,7 @@
 {
     "files.associations": {
         "sdkconfig.h": "c",
-        "swh_rgb.h": "c"
+        "swh_rgb.h": "c",
+        "freertos.h": "c"
     }
 }
