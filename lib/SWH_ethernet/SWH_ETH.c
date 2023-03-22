@@ -16,6 +16,7 @@
 #include "SWH_RGB.h"
 
 EventGroupHandle_t swh_ethernet_event_group;
+esp_eth_handle_t eth_handle;
 
 static char* ETH_TAG = "SWH_ethernet";
 /** Event handler for Ethernet events */
@@ -24,7 +25,7 @@ static void eth_event_handler(void *arg, esp_event_base_t event_base,
 {
     uint8_t mac_addr[6] = {0};
     /* we can get the ethernet driver handle from event data */
-    esp_eth_handle_t eth_handle = *(esp_eth_handle_t *)event_data;
+    eth_handle = *(esp_eth_handle_t *)event_data;
 
     switch (event_id) {
     case ETHERNET_EVENT_CONNECTED:

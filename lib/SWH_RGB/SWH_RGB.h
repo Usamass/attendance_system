@@ -1,7 +1,7 @@
 #include <inttypes.h>
 
 
-#define RED_LED_PIN GPIO_NUM_5
+#define RED_LED_PIN GPIO_NUM_26
 #define GREEN_LED_PIN GPIO_NUM_17
 #define BLUE_LED_PIN GPIO_NUM_16
 
