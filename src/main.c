@@ -17,31 +17,20 @@
 #include "SWH_ETH.h"
 #include "../event_bits.h"
 #include "../SWH_eventGroups.h"
+#include "../SWH_custom_data_structs.h"
+#include "../SWH_event_flags.h"
+#include "../SWH_data_buffers.h"
 #include "device_configs.h"
 #include "swh_file_system.h"
 
+
 // static const char *ETH_TAG = "SWH_eth_test";
 // static const char *HTTP_SERVER_TAG = "SWH_HTTP_TEST";
-extern esp_eth_handle_t eth_handle;
-
-#define ETHERNET_CONNECT_FLAG 12
-#define ETHERNET_DISCONNECT_FLAG 13
-#define GOT_IP_FLAG 14
-
-// ------------- include all the notifications msgs in this struct--------
-typedef struct
-{
-    int val;
-    char* from;
-    char* msg;
-
-} NOTIFIER;
-//------------------------------------------------------------------------
-
-// esp_err_t authenticateMe();
+extern esp_eth_handle_t eth_handle; // ethernet handler for getting mac addr in this file.
 esp_err_t getStudentsData(device_config_t);
 
 QueueHandle_t mailBox;
+QueueHandle_t spiffs_mailBox;
 
 #define EXAMPLE_ESP_MAXIMUM_RETRY (5)
 #define EXAMPLE_HTTP_QUERY_KEY_MAX_LEN (64)
@@ -168,8 +157,6 @@ static void networkStatusTask(void *pvParameter)
             ESP_LOGI(HTTP_CLIENT_TAG, "initializting client\n");
             noti.val = GOT_IP_FLAG;
             noti.msg = "got ip address";
-            // server_initiation();
-            //authenticateMe();
             getStudentsData(dConfig);
 
             mailBox_status = xQueueSend(mailBox, &noti, portMAX_DELAY);
@@ -242,15 +229,118 @@ static void notifierTask()
     }
 }
 
+static void db_interface_task()
+{
+    BaseType_t mailBox_status;
+
+    SPIFFS_NOTIFIER spiffs_noti;
+    while (true){
+        EventBits_t requestBits = xEventGroupWaitBits(
+            spiffs_event_group,
+            CLIENT_RECIEVED_BIT, // add other event bit as the application grows.
+            pdTRUE,
+            pdFALSE,
+            portMAX_DELAY
+            );
+            if ((requestBits & CLIENT_RECIEVED_BIT) != 0)
+            {   
+                DataSource_t dataSrc = CLIENT;
+                spiffs_noti.data_scr =   dataSrc;
+                spiffs_noti.flag_type = CLIENT_READ_FLAG;
+                spiffs_noti.data = client_receive_buffer;
+                
+                mailBox_status = xQueueSend(mailBox, &spiffs_noti, portMAX_DELAY);
+                if (mailBox_status != pdPASS)
+                {
+                    ESP_LOGI(MAILBOX_TAG, "Could not send to the queue \n");
+                }
+            }
+    }
+
+
+}
+
+
+static void spiffs_task()
+{
+    BaseType_t mailBox_status;
+    SPIFFS_NOTIFIER spiffs_noti;
+
+    while (true)
+    {
+        mailBox_status = xQueueReceive(mailBox, &spiffs_noti, portMAX_DELAY);
+        if (mailBox_status == pdPASS){
+            ESP_LOGI(MAILBOX_TAG, "data received form : %d \t data = %s \n", spiffs_noti.data_scr, spiffs_noti.data);
+            if (spiffs_noti.data_scr == CLIENT){
+                if (spiffs_noti.flag_type == CLIENT_WRITE_FLAG){
+                    if (spiffs_noti.data != NULL){
+                        ESP_LOGI(TAG_exe, "Opening file");
+                        FILE* f = fopen("/spiffs/stdData.txt", "w");
+                        if (f == NULL) {
+                            ESP_LOGE(TAG_exe, "Failed to open file for writing");
+                            
+                        }
+                        fprintf(f, spiffs_noti.data);
+                        fclose(f);
+                        free(spiffs_noti.data);
+                        ESP_LOGI(TAG_exe, "File written");
+
+                    }
+                }
+                else {
+                    ESP_LOGI(TAG_exe, "Reading file");
+                    FILE* f = fopen("/spiffs/stdData.txt", "r");
+                    if (f == NULL) {
+                        ESP_LOGE(TAG_exe, "Failed to open file for reading");
+                        return;
+                    }
+                    fseek(f, 0L, SEEK_END); // move file pointer to end of file
+                    long size = ftell(f); // get file size
+                    fseek(f, 0L, SEEK_SET); // move file pointer back to beginning of file
+                    
+                    char* data = (char*) malloc(size); // allocate memory for buffer
+                    if (data == NULL) {
+                        ESP_LOGI(TAG_exe , "Error allocating memory.\n");
+                        fclose(f);
+                        return;
+                    }
+                    
+                    size_t result = fread(data, 1, size, f); // read file into buffer
+                    if (result != size) {
+                        ESP_LOGI(TAG_exe , "Error reading file.\n");
+                        free(data);
+                        fclose(f);
+                        return;
+                    }
+                    
+                    fclose(f); // close the file
+                    
+                    ESP_LOGI(TAG_exe, "Read from file: '%s'" , data);
+                    //xEventGroupSetBits(spiffs_event_group, SPIFFS_OPERATION_DONE);
+                    
+
+
+                }
+            }
+        }
+        else
+        {
+            ESP_LOGI(MAILBOX_TAG, "could not receive from the mailbox \n");
+        }
+    }
+}
+
+
+
 void app_main(void)
 {
     // init(); // this function will initialize all the configs on device.
     rgbConfig();
     swh_eth_init(); // initializing ethernet hardware.
     swh_file_system_init();  // initializing file system.
-   
+    spiffs_event_group = xEventGroupCreate();
+    xEventGroupClearBits(spiffs_event_group , CLIENT_RECIEVED_BIT | SPIFFS_OPERATION_DONE);
 
-    printf("Event group handle in main: %p\n", swh_ethernet_event_group);
     xTaskCreate(networkStatusTask, "network status task", 4000, NULL, 1, NULL);
     mailBox = xQueueCreate(1, sizeof(NOTIFIER)); // creating mailbox with 1 NOTIFIER space.
 
@@ -265,6 +355,19 @@ void app_main(void)
 
         ESP_LOGI(MAILBOX_TAG, "mailbox could not created \n");
     }
+    spiffs_mailBox = xQueueCreate(1, sizeof(SPIFFS_NOTIFIER)); // creating mailbox with 1 NOTIFIER space.
+    
+    if (spiffs_mailBox != NULL)
+    {
+        ESP_LOGI(MAILBOX_TAG, "spiffs mailbox has been created!\n");
+        xTaskCreate(db_interface_task, "db-interface-task", 2048, NULL, 1, NULL);
+        xTaskCreate(spiffs_task, "spiffs task", 4048, NULL, 3, NULL);
+    }
+    else
+    {
+
+        ESP_LOGI(MAILBOX_TAG, "spiffs mailbox could not created \n");
+    }
 
 }
 
@@ -273,7 +376,9 @@ esp_err_t getStudentsData(device_config_t dConfig)
     const int locationID = getLocationId(&dConfig);
     const char* auth = getAuthToken(&dConfig);
 
-    char local_response_buffer[MAX_HTTP_OUTPUT_BUFFER];
+    //char local_response_buffer[MAX_HTTP_OUTPUT_BUFFER];
+    client_receive_buffer = (char*)malloc(MAX_HTTP_OUTPUT_BUFFER * sizeof(char));
+
     esp_err_t err;
     // making query string.
     char queryString[13] = "location_id=";
@@ -285,7 +390,7 @@ esp_err_t getStudentsData(device_config_t dConfig)
         .query = queryString,
         .method = HTTP_METHOD_GET,
         .event_handler = _http_event_handler,
-        .user_data = local_response_buffer,        // Pass address of local buffer to get response
+        .user_data = client_receive_buffer,        // Pass address of local buffer to get response
         .disable_auto_redirect = true,
     };
     esp_http_client_handle_t client = esp_http_client_init(&config);
@@ -304,7 +409,7 @@ esp_err_t getStudentsData(device_config_t dConfig)
         return ESP_FAIL;
         
     }
-    ESP_LOG_BUFFER_HEX(HTTP_CLIENT_TAG, local_response_buffer, strlen(local_response_buffer));
+    ESP_LOG_BUFFER_HEX(HTTP_CLIENT_TAG, client_receive_buffer, strlen(client_receive_buffer));
 
     return ESP_OK;
 }

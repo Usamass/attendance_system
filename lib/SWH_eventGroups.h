@@ -3,3 +3,4 @@
 
 
 extern EventGroupHandle_t swh_ethernet_event_group;
+EventGroupHandle_t spiffs_event_group;
