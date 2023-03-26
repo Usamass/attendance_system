@@ -18,6 +18,7 @@
 #include "../event_bits.h"
 #include "../SWH_eventGroups.h"
 #include "device_configs.h"
+#include "swh_file_system.h"
 
 // static const char *ETH_TAG = "SWH_eth_test";
 // static const char *HTTP_SERVER_TAG = "SWH_HTTP_TEST";
@@ -38,7 +39,7 @@ typedef struct
 //------------------------------------------------------------------------
 
 // esp_err_t authenticateMe();
-esp_err_t getStudentsData();
+esp_err_t getStudentsData(device_config_t);
 
 QueueHandle_t mailBox;
 
@@ -49,6 +50,7 @@ QueueHandle_t mailBox;
 
 static const char *HTTP_CLIENT_TAG = "http client";
 static const char *MAILBOX_TAG = "mailbox";
+static const char *TAG_exe = "spiffs";
 // static const char *JSON_TAG = "JSON";
 // ------------------------------------ ESP_HTTP_CLIENT_EVENT_HANDLER---------------------------
 
@@ -148,6 +150,12 @@ static void networkStatusTask(void *pvParameter)
 {
     BaseType_t mailBox_status;
     NOTIFIER noti;
+     device_config_t dConfig = {
+        .device_id = "LRO_1",
+        .authToken = "asldkhoiawe34",
+        .location_id = 2,
+        .location_name = "lahore"
+    };
 
     while (true){
         EventBits_t connectBits = xEventGroupWaitBits(
@@ -162,7 +170,7 @@ static void networkStatusTask(void *pvParameter)
             noti.msg = "got ip address";
             // server_initiation();
             //authenticateMe();
-            getStudentsData();
+            getStudentsData(dConfig);
 
             mailBox_status = xQueueSend(mailBox, &noti, portMAX_DELAY);
             if (mailBox_status != pdPASS){
@@ -238,8 +246,8 @@ void app_main(void)
 {
     // init(); // this function will initialize all the configs on device.
     rgbConfig();
-
     swh_eth_init(); // initializing ethernet hardware.
+    swh_file_system_init();  // initializing file system.
    
 
     printf("Event group handle in main: %p\n", swh_ethernet_event_group);
@@ -260,14 +268,15 @@ void app_main(void)
 
 }
 
-esp_err_t getStudentsData()
+esp_err_t getStudentsData(device_config_t dConfig)
 {
+    const int locationID = getLocationId(&dConfig);
+    const char* auth = getAuthToken(&dConfig);
 
     char local_response_buffer[MAX_HTTP_OUTPUT_BUFFER];
     esp_err_t err;
     // making query string.
     char queryString[13] = "location_id=";
-    const int locationID = getLocationId(&dConfig);
     queryString[12] = '0' + locationID;
 
        esp_http_client_config_t config = {
@@ -280,7 +289,7 @@ esp_err_t getStudentsData()
         .disable_auto_redirect = true,
     };
     esp_http_client_handle_t client = esp_http_client_init(&config);
-    esp_http_client_set_header(client , "token" , dConfig.authToken);
+    esp_http_client_set_header(client , "token" , auth);
    
     // GET
     err = esp_http_client_perform(client);
