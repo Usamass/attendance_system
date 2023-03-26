@@ -237,7 +237,7 @@ static void db_interface_task()
     while (true){
         EventBits_t requestBits = xEventGroupWaitBits(
             spiffs_event_group,
-            CLIENT_RECIEVED_BIT, // add other event bit as the application grows.
+            CLIENT_RECIEVED_BIT | DEVICE_CONFIG_BIT, // add other event bit as the application grows.
             pdTRUE,
             pdFALSE,
             portMAX_DELAY
@@ -246,14 +246,28 @@ static void db_interface_task()
             {   
                 DataSource_t dataSrc = CLIENT;
                 spiffs_noti.data_scr =   dataSrc;
-                spiffs_noti.flag_type = CLIENT_READ_FLAG;
+                spiffs_noti.flag_type = CLIENT_WRITE_FLAG;
                 spiffs_noti.data = client_receive_buffer;
                 
-                mailBox_status = xQueueSend(mailBox, &spiffs_noti, portMAX_DELAY);
+                mailBox_status = xQueueSend(spiffs_mailBox, &spiffs_noti, portMAX_DELAY);
                 if (mailBox_status != pdPASS)
                 {
                     ESP_LOGI(MAILBOX_TAG, "Could not send to the queue \n");
                 }
+            }
+            else if ((requestBits & DEVICE_CONFIG_BIT) != 0){
+                // before sending it must convert it into json format.
+                DataSource_t dataSrc = DEVICE_CONFIGS;
+                spiffs_noti.data_scr =   dataSrc;
+                spiffs_noti.flag_type = DEVICE_CONFIG_WRITE_FLAG;
+                spiffs_noti.data = UI_request_buffer;
+
+                 mailBox_status = xQueueSend(spiffs_mailBox, &spiffs_noti, portMAX_DELAY);
+                if (mailBox_status != pdPASS)
+                {
+                    ESP_LOGI(MAILBOX_TAG, "Could not send to the queue \n");
+                }
+
             }
     }
 
@@ -268,13 +282,13 @@ static void spiffs_task()
 
     while (true)
     {
-        mailBox_status = xQueueReceive(mailBox, &spiffs_noti, portMAX_DELAY);
+        mailBox_status = xQueueReceive(spiffs_mailBox, &spiffs_noti, portMAX_DELAY);
         if (mailBox_status == pdPASS){
             ESP_LOGI(MAILBOX_TAG, "data received form : %d \t data = %s \n", spiffs_noti.data_scr, spiffs_noti.data);
             if (spiffs_noti.data_scr == CLIENT){
                 if (spiffs_noti.flag_type == CLIENT_WRITE_FLAG){
                     if (spiffs_noti.data != NULL){
-                        ESP_LOGI(TAG_exe, "Opening file");
+                        ESP_LOGI(TAG_exe, "Opening stdData.txt file");
                         FILE* f = fopen("/spiffs/stdData.txt", "w");
                         if (f == NULL) {
                             ESP_LOGE(TAG_exe, "Failed to open file for writing");
@@ -288,7 +302,7 @@ static void spiffs_task()
                     }
                 }
                 else {
-                    ESP_LOGI(TAG_exe, "Reading file");
+                    ESP_LOGI(TAG_exe, "Reading from stdData.txt file");
                     FILE* f = fopen("/spiffs/stdData.txt", "r");
                     if (f == NULL) {
                         ESP_LOGE(TAG_exe, "Failed to open file for reading");
@@ -320,6 +334,25 @@ static void spiffs_task()
                     
 
 
+                }
+            }
+            else if (spiffs_noti.data_scr == DEVICE_CONFIGS){
+                if (spiffs_noti.flag_type == DEVICE_CONFIG_WRITE_FLAG){
+                    if (spiffs_noti.data != NULL){
+                        ESP_LOGI(TAG_exe, "Opening deviceConfigs.txt file");
+                        FILE* f = fopen("/spiffs/deviceConfigs.txt", "w");
+                        if (f == NULL) {
+                            ESP_LOGE(TAG_exe, "Failed to open file for writing");
+                            
+                        }
+                        fprintf(f, spiffs_noti.data);
+                        fclose(f);
+                        free(spiffs_noti.data);
+                        ESP_LOGI(TAG_exe, "File written");
+                        // task that is waiting for the spiffs operation to be done will be signaled
+                        //xEventGroupSetBits(spiffs_event_group , SPIFFS_OPERATION_DONE);
+
+                    }
                 }
             }
         }
@@ -381,13 +414,16 @@ esp_err_t getStudentsData(device_config_t dConfig)
 
     esp_err_t err;
     // making query string.
-    char queryString[13] = "location_id=";
-    queryString[12] = '0' + locationID;
+    //char queryString[15];
+    char url[100];
+    snprintf(url, sizeof(url), "http://192.168.50.209:8000/api/students?location=%d", locationID);
+   // snprintf(url, sizeof(queryString), "location=%d", locationID);
 
        esp_http_client_config_t config = {
-        .host = "192.168.50.209:8000",
-        .path = "/api/students",
-        .query = queryString,
+        // .host = "192.168.50.209:8000",
+        // .path = "/api/students",
+        // .query = queryString,
+        .url = url,
         .method = HTTP_METHOD_GET,
         .event_handler = _http_event_handler,
         .user_data = client_receive_buffer,        // Pass address of local buffer to get response
@@ -400,9 +436,13 @@ esp_err_t getStudentsData(device_config_t dConfig)
     err = esp_http_client_perform(client);
 
     if (err == ESP_OK) {
+        int status_code = esp_http_client_get_status_code(client);
         ESP_LOGI(HTTP_CLIENT_TAG, "HTTP GET Status = %d, content_length = %"PRIu64,
-                esp_http_client_get_status_code(client),
+                status_code,
                 esp_http_client_get_content_length(client));
+        if (status_code == 200){
+            xEventGroupSetBits(spiffs_event_group , CLIENT_RECIEVED_BIT);
+        }
     } else {
         ESP_LOGE(HTTP_CLIENT_TAG, "HTTP GET request failed: %s", esp_err_to_name(err));
 
