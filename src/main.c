@@ -17,6 +17,7 @@
 #include "SWH_ETH.h"
 #include "../event_bits.h"
 #include "../SWH_eventGroups.h"
+#include "device_configs.h"
 
 // static const char *ETH_TAG = "SWH_eth_test";
 // static const char *HTTP_SERVER_TAG = "SWH_HTTP_TEST";
@@ -34,20 +35,10 @@ typedef struct
     char* msg;
 
 } NOTIFIER;
-//-------------------------------------------------------------------------
-typedef struct
-{
-    char* device_id;
-    char* MAC_addr;
-    int   location_id;
-    char* location_name;
-    // if authentication token accquired.
-    char *authToken;
+//------------------------------------------------------------------------
 
-}device_config_t;
-
-esp_err_t authenticateMe();
-esp_err_t getData();
+// esp_err_t authenticateMe();
+esp_err_t getStudentsData();
 
 QueueHandle_t mailBox;
 
@@ -58,7 +49,7 @@ QueueHandle_t mailBox;
 
 static const char *HTTP_CLIENT_TAG = "http client";
 static const char *MAILBOX_TAG = "mailbox";
-static const char *JSON_TAG = "JSON";
+// static const char *JSON_TAG = "JSON";
 // ------------------------------------ ESP_HTTP_CLIENT_EVENT_HANDLER---------------------------
 
 esp_err_t _http_event_handler(esp_http_client_event_t *evt)
@@ -171,7 +162,7 @@ static void networkStatusTask(void *pvParameter)
             noti.msg = "got ip address";
             // server_initiation();
             //authenticateMe();
-            getData();
+            getStudentsData();
 
             mailBox_status = xQueueSend(mailBox, &noti, portMAX_DELAY);
             if (mailBox_status != pdPASS){
@@ -247,11 +238,9 @@ void app_main(void)
 {
     // init(); // this function will initialize all the configs on device.
     rgbConfig();
-    setRGBLED(0 , 1 , 1); // set Red led by default in beginning
-    gpio_reset_pin(BUZZER_PIN); // resetting buzzer pin
-    gpio_set_direction(BUZZER_PIN , GPIO_MODE_OUTPUT);  // setting buzzer pin as an output
 
     swh_eth_init(); // initializing ethernet hardware.
+   
 
     printf("Event group handle in main: %p\n", swh_ethernet_event_group);
     xTaskCreate(networkStatusTask, "network status task", 4000, NULL, 1, NULL);
@@ -271,97 +260,30 @@ void app_main(void)
 
 }
 
-esp_err_t authenticateMe()
+esp_err_t getStudentsData()
 {
-    //Getting MAC address of the device
-    uint8_t mac_addr[6] = {0};
-    char macStr[18];
-
-    esp_eth_ioctl(eth_handle, ETH_CMD_G_MAC_ADDR, mac_addr);
-    snprintf(macStr , sizeof(macStr) , "%02X:%02X:%02X:%02X:%02X:%02X", 
-    mac_addr[0], mac_addr[1], 
-    mac_addr[2], mac_addr[3], 
-    mac_addr[4], mac_addr[5]);
-
-    ESP_LOGI("from authenticatMe" , "char mac addr -> %s", macStr);
-    // Serializing data to JSON format
-    cJSON* root = cJSON_CreateObject(); // creating a json object
-    cJSON_AddStringToObject(root , "device_id" , "LRO_01");
-    cJSON_AddStringToObject(root , "MAC" , macStr);
-    cJSON_AddNumberToObject(root , "location_id" , 1);
-    const char* jsonString = cJSON_Print(root);
-    cJSON_Delete(root);    
 
     char local_response_buffer[MAX_HTTP_OUTPUT_BUFFER];
     esp_err_t err;
+    // making query string.
+    char queryString[13] = "location_id=";
+    const int locationID = getLocationId(&dConfig);
+    queryString[12] = '0' + locationID;
+
        esp_http_client_config_t config = {
         .host = "192.168.50.209:8000",
-        .path = "/api/devices",
-        .event_handler = _http_event_handler,
-        .method = HTTP_METHOD_POST,
-        .user_data = local_response_buffer,        // Pass address of local buffer to get response
-        .disable_auto_redirect = true,
-    };
-    esp_http_client_handle_t client = esp_http_client_init(&config);
-    esp_http_client_set_url(client , "http://192.168.50.209:8000/api/devices");
-    esp_http_client_set_header(client , "Content-Type" , "application/json");
-    esp_http_client_set_post_field(client , jsonString , strlen(jsonString));
-    
-    free((void*)jsonString); // freeup the allocated space.
-
-    // POST
-    err = esp_http_client_perform(client);
-    
-    if (err == ESP_OK) {
-        ESP_LOGI(HTTP_CLIENT_TAG, "HTTP POST Status = %d, content_length = %"PRIu64,
-                esp_http_client_get_status_code(client),
-                esp_http_client_get_content_length(client));
-        
-        ESP_LOGI(JSON_TAG, "Deserialize.....");
-        cJSON *root2 = cJSON_Parse(local_response_buffer);
-        if (cJSON_GetObjectItem(root2, "device_id")) {
-            char *device_id = cJSON_GetObjectItem(root2,"device_id")->valuestring;
-            ESP_LOGI(JSON_TAG, "device_id=%s",device_id);
-        }
-        if (cJSON_GetObjectItem(root2, "MAC")) {
-            char* MAC_addr = cJSON_GetObjectItem(root2,"MAC")->valuestring;
-            ESP_LOGI(JSON_TAG, "MAC=%s",MAC_addr);
-        }
-        if (cJSON_GetObjectItem(root2, "location_id")) {
-            int location_id = cJSON_GetObjectItem(root2,"location_id")->valueint;
-            ESP_LOGI(JSON_TAG, "location_id=%d",location_id);
-        }
-        cJSON_Delete(root2);
-
-    } else {
-        ESP_LOGE(HTTP_CLIENT_TAG, "HTTP POST request failed: %s", esp_err_to_name(err));
-     
-        return ESP_FAIL;
-        
-    }
-    ESP_LOG_BUFFER_HEX(HTTP_CLIENT_TAG, local_response_buffer, strlen(local_response_buffer));
-
-    return ESP_OK;
-
-}
-
-esp_err_t getData()
-{
-     char local_response_buffer[MAX_HTTP_OUTPUT_BUFFER];
-    esp_err_t err;
-       esp_http_client_config_t config = {
-        .url = "http://192.168.50.209:8000/api/batches",// set uri for getting student data.
+        .path = "/api/students",
+        .query = queryString,
         .method = HTTP_METHOD_GET,
         .event_handler = _http_event_handler,
         .user_data = local_response_buffer,        // Pass address of local buffer to get response
         .disable_auto_redirect = true,
     };
     esp_http_client_handle_t client = esp_http_client_init(&config);
-    esp_http_client_set_header(client , "token" , );
+    esp_http_client_set_header(client , "token" , dConfig.authToken);
    
     // GET
     err = esp_http_client_perform(client);
-    // free allocated memory.
 
     if (err == ESP_OK) {
         ESP_LOGI(HTTP_CLIENT_TAG, "HTTP GET Status = %d, content_length = %"PRIu64,
