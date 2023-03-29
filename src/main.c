@@ -15,6 +15,7 @@
 #include "cJSON.h"
 #include "SWH_RGB.h"
 #include "SWH_ETH.h"
+#include "swh_server.h"
 #include "../event_bits.h"
 #include "../SWH_eventGroups.h"
 #include "../SWH_custom_data_structs.h"
@@ -157,7 +158,9 @@ static void networkStatusTask(void *pvParameter)
             ESP_LOGI(HTTP_CLIENT_TAG, "initializting client\n");
             noti.val = GOT_IP_FLAG;
             noti.msg = "got ip address";
-            getStudentsData(dConfig);
+            swh_server_init();
+
+            //getStudentsData(dConfig);
 
             mailBox_status = xQueueSend(mailBox, &noti, portMAX_DELAY);
             if (mailBox_status != pdPASS){
@@ -415,15 +418,15 @@ esp_err_t getStudentsData(device_config_t dConfig)
     esp_err_t err;
     // making query string.
     //char queryString[15];
-    char url[100];
-    snprintf(url, sizeof(url), "http://192.168.50.209:8000/api/students?location=%d", locationID);
+    //char url[100];
+    //snprintf(url, sizeof(url), "http://192.168.50.209:8000/api/students?location=%d", locationID);
    // snprintf(url, sizeof(queryString), "location=%d", locationID);
 
        esp_http_client_config_t config = {
-        // .host = "192.168.50.209:8000",
-        // .path = "/api/students",
+        .host = "2a85849f-67d6-40e7-a2cc-87c61ef2ac71.mock.pstmn.io",
+        .path = "/getStudentData",
         // .query = queryString,
-        .url = url,
+        // .url = "https://2a85849f-67d6-40e7-a2cc-87c61ef2ac71.mock.pstmn.io/getStudentData",
         .method = HTTP_METHOD_GET,
         .event_handler = _http_event_handler,
         .user_data = client_receive_buffer,        // Pass address of local buffer to get response

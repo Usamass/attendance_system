@@ -1,0 +1,1 @@
+void swh_server_init();
