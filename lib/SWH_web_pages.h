@@ -45,7 +45,10 @@ char loginPage[] =
 "      }\n"
 "\n"
 "      button[type=\"submit\"]:hover {\n"
-"        background-color: #006a8e;\n"
+"        background-color: #006a8e;\n"  // }else {
+    //     httpd_resp_send_404(req);
+  
+    // }
 "      }\n"
 "    </style>\n"
 "  </head>\n"

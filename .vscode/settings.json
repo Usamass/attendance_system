@@ -4,6 +4,8 @@
         "swh_rgb.h": "c",
         "freertos.h": "c",
         "swh_custom_data_structs.h": "c",
-        "swh_server.h": "c"
-    }
+        "swh_server.h": "c",
+        "user_login_data.h": "c"
+    },
+    "C_Cpp.errorSquiggles": "disabled"
 }

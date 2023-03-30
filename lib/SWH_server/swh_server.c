@@ -3,7 +3,7 @@
 #include "cJSON.h"
 #include "swh_server.h"
 #include "../SWH_web_pages.h"
-#include "../user_login_data.h"
+#include "user_login_data.h"
 static char* HTTP_SERVER_TAG = "server tag";
 static char* JSON_TAG = "json tag";
 #define MIN(a,b) (((a)<(b))?(a):(b))
@@ -20,6 +20,7 @@ static esp_err_t echo_post_handler(httpd_req_t *req)
     char buf[100];
     char* username = NULL;
     char* password = NULL;
+    user_credentials* usr = usr_data_init();
     int ret, remaining = req->content_len;
 
     while (remaining > 0) {
@@ -43,10 +44,12 @@ static esp_err_t echo_post_handler(httpd_req_t *req)
             ESP_LOGI(JSON_TAG, "password=%s",password);
         }
 
-        if (!(strcmp(username , usr.username) || strcmp(password , usr.password))){
+        if (!(strcmp(username , usr->username) || strcmp(password , usr->password))){
             ESP_LOGI(HTTP_SERVER_TAG , "login sucessful!");
+
             httpd_resp_set_status(req, HTTPD_200);
             httpd_resp_set_hdr(req, "Content-Type", "text/plain");
+            httpd_resp_set_hdr(req , "Autherization" , make_auth_token());
 
             // Send the header with a NULL payload and length 0
             httpd_resp_send(req, NULL, 0);          
@@ -65,9 +68,17 @@ static esp_err_t echo_post_handler(httpd_req_t *req)
 esp_err_t dashboard_handler(httpd_req_t *req)
 {
     int response;
-   
+    char auth_token[50];
+    //if (httpd_req_get_hdr_value_str(req , "Autherization", auth_token , 50) == ESP_OK){
     response = httpd_resp_send(req, dashboard, HTTPD_RESP_USE_STRLEN);
     return response;
+    // }else {
+    //     httpd_resp_send_404(req);
+  
+    // }
+
+    return ESP_OK;
+
 }
 
 void swh_server_init()
