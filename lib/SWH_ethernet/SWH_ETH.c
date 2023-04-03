@@ -14,9 +14,11 @@
 #include "esp_chip_info.h"
 #include "../event_bits.h"
 #include "SWH_RGB.h"
+#include "device_configs.h"
 
 EventGroupHandle_t swh_ethernet_event_group;
 esp_eth_handle_t eth_handle;
+device_config_t dConfig;    // dConfig defined here first.
 
 static char* ETH_TAG = "SWH_ethernet";
 /** Event handler for Ethernet events */
@@ -35,6 +37,7 @@ static void eth_event_handler(void *arg, esp_event_base_t event_base,
         ESP_LOGI(ETH_TAG, "Ethernet Link Up");
         ESP_LOGI(ETH_TAG, "Ethernet HW Addr %02x:%02x:%02x:%02x:%02x:%02x",
                  mac_addr[0], mac_addr[1], mac_addr[2], mac_addr[3], mac_addr[4], mac_addr[5]);
+        setMacAddr(&dConfig , mac_addr);
         break;
     case ETHERNET_EVENT_DISCONNECTED:
         ESP_LOGI(ETH_TAG, "Ethernet Link Down");
@@ -66,13 +69,13 @@ static void got_ip_event_handler(void *arg, esp_event_base_t event_base,
     ESP_LOGI(ETH_TAG, "ETHMASK:" IPSTR, IP2STR(&ip_info->netmask));
     ESP_LOGI(ETH_TAG, "ETHGW:" IPSTR, IP2STR(&ip_info->gw));
     ESP_LOGI(ETH_TAG, "~~~~~~~~~~~");
+    setIpAddr(&dConfig , &event->ip_info);
     setRGBLED(1 , 0 , 1);
     xEventGroupSetBits(swh_ethernet_event_group , GOT_IP_BIT);
 }
 
 void swh_eth_init()
 {
-    ESP_LOGI(ETH_TAG, "");
 
     swh_ethernet_event_group = xEventGroupCreate();
     xEventGroupClearBits(swh_ethernet_event_group , ETHERNET_CONNECTED_BIT | 

@@ -27,11 +27,11 @@
 
 // static const char *ETH_TAG = "SWH_eth_test";
 // static const char *HTTP_SERVER_TAG = "SWH_HTTP_TEST";
-extern esp_eth_handle_t eth_handle; // ethernet handler for getting mac addr in this file.
-esp_err_t getStudentsData(device_config_t);
+// esp_err_t getStudentsData(device_config_t);
 
 QueueHandle_t mailBox;
 QueueHandle_t spiffs_mailBox;
+extern device_config_t dConfig; // device ip and mac will be set on connect to network
 
 #define EXAMPLE_ESP_MAXIMUM_RETRY (5)
 #define EXAMPLE_HTTP_QUERY_KEY_MAX_LEN (64)
@@ -140,12 +140,6 @@ static void networkStatusTask(void *pvParameter)
 {
     BaseType_t mailBox_status;
     NOTIFIER noti;
-    device_config_t dConfig = {
-        .device_id = "LRO_1",
-        .authToken = "asldkhoiawe34",
-        .location_id = 2,
-        .location_name = "lahore"};
-
     while (true)
     {
         EventBits_t connectBits = xEventGroupWaitBits(
@@ -411,55 +405,55 @@ void app_main(void)
     }
 }
 
-esp_err_t getStudentsData(device_config_t dConfig)
-{
-    const int locationID = getLocationId(&dConfig);
-    const char *auth = getAuthToken(&dConfig);
+// esp_err_t getStudentsData(device_config_t dConfig)
+// {
+//     // const int locationID = getLocationId(&dConfig);
+//     // const char *auth = getAuthToken(&dConfig);
 
-    // char local_response_buffer[MAX_HTTP_OUTPUT_BUFFER];
-    client_receive_buffer = (char *)malloc(MAX_HTTP_OUTPUT_BUFFER * sizeof(char));
+//     // char local_response_buffer[MAX_HTTP_OUTPUT_BUFFER];
+//     client_receive_buffer = (char *)malloc(MAX_HTTP_OUTPUT_BUFFER * sizeof(char));
 
-    esp_err_t err;
-    // making query string.
-    // char queryString[15];
-    // char url[100];
-    // snprintf(url, sizeof(url), "http://192.168.50.209:8000/api/students?location=%d", locationID);
-    // snprintf(url, sizeof(queryString), "location=%d", locationID);
+//     esp_err_t err;
+//     // making query string.
+//     // char queryString[15];
+//     // char url[100];
+//     // snprintf(url, sizeof(url), "http://192.168.50.209:8000/api/students?location=%d", locationID);
+//     // snprintf(url, sizeof(queryString), "location=%d", locationID);
 
-    esp_http_client_config_t config = {
-        .host = "2a85849f-67d6-40e7-a2cc-87c61ef2ac71.mock.pstmn.io",
-        .path = "/getStudentData",
-        // .query = queryString,
-        // .url = "https://2a85849f-67d6-40e7-a2cc-87c61ef2ac71.mock.pstmn.io/getStudentData",
-        .method = HTTP_METHOD_GET,
-        .event_handler = _http_event_handler,
-        .user_data = client_receive_buffer, // Pass address of local buffer to get response
-        .disable_auto_redirect = true,
-    };
-    esp_http_client_handle_t client = esp_http_client_init(&config);
-    esp_http_client_set_header(client, "token", auth);
+//     esp_http_client_config_t config = {
+//         .host = "2a85849f-67d6-40e7-a2cc-87c61ef2ac71.mock.pstmn.io",
+//         .path = "/getStudentData",
+//         // .query = queryString,
+//         // .url = "https://2a85849f-67d6-40e7-a2cc-87c61ef2ac71.mock.pstmn.io/getStudentData",
+//         .method = HTTP_METHOD_GET,
+//         .event_handler = _http_event_handler,
+//         .user_data = client_receive_buffer, // Pass address of local buffer to get response
+//         .disable_auto_redirect = true,
+//     };
+//     esp_http_client_handle_t client = esp_http_client_init(&config);
+//     esp_http_client_set_header(client, "token", auth);
 
-    // GET
-    err = esp_http_client_perform(client);
+//     // GET
+//     err = esp_http_client_perform(client);
 
-    if (err == ESP_OK)
-    {
-        int status_code = esp_http_client_get_status_code(client);
-        ESP_LOGI(HTTP_CLIENT_TAG, "HTTP GET Status = %d, content_length = %" PRIu64,
-                 status_code,
-                 esp_http_client_get_content_length(client));
-        if (status_code == 200)
-        {
-            xEventGroupSetBits(spiffs_event_group, CLIENT_RECIEVED_BIT);
-        }
-    }
-    else
-    {
-        ESP_LOGE(HTTP_CLIENT_TAG, "HTTP GET request failed: %s", esp_err_to_name(err));
+//     if (err == ESP_OK)
+//     {
+//         int status_code = esp_http_client_get_status_code(client);
+//         ESP_LOGI(HTTP_CLIENT_TAG, "HTTP GET Status = %d, content_length = %" PRIu64,
+//                  status_code,
+//                  esp_http_client_get_content_length(client));
+//         if (status_code == 200)
+//         {
+//             xEventGroupSetBits(spiffs_event_group, CLIENT_RECIEVED_BIT);
+//         }
+//     }
+//     else
+//     {
+//         ESP_LOGE(HTTP_CLIENT_TAG, "HTTP GET request failed: %s", esp_err_to_name(err));
 
-        return ESP_FAIL;
-    }
-    ESP_LOG_BUFFER_HEX(HTTP_CLIENT_TAG, client_receive_buffer, strlen(client_receive_buffer));
+//         return ESP_FAIL;
+//     }
+//     ESP_LOG_BUFFER_HEX(HTTP_CLIENT_TAG, client_receive_buffer, strlen(client_receive_buffer));
 
-    return ESP_OK;
-}
+//     return ESP_OK;
+// }

@@ -5,7 +5,8 @@
         "freertos.h": "c",
         "swh_custom_data_structs.h": "c",
         "swh_server.h": "c",
-        "user_login_data.h": "c"
+        "user_login_data.h": "c",
+        "esp_netif.h": "c"
     },
     "C_Cpp.errorSquiggles": "disabled"
 }

@@ -1,11 +1,17 @@
 #include "esp_log.h"
 #include "esp_http_server.h"
+#include "device_configs.h" // for getting mac address or setting device configs.
 #include "cJSON.h"
 #include "swh_server.h"
 #include "../SWH_web_pages.h"
 #include "user_login_data.h"
+#include "device_configs.h"
+
+extern device_config_t dConfig;
+
 static char* HTTP_SERVER_TAG = "server tag";
 static char* JSON_TAG = "json tag";
+static bool login_flag = false;
 #define MIN(a,b) (((a)<(b))?(a):(b))
 
 esp_err_t login_page(httpd_req_t *req)
@@ -46,10 +52,7 @@ static esp_err_t echo_post_handler(httpd_req_t *req)
 
         if (!(strcmp(username , usr->username) || strcmp(password , usr->password))){
             ESP_LOGI(HTTP_SERVER_TAG , "login sucessful!");
-
-            httpd_resp_set_status(req, HTTPD_200);
-            httpd_resp_set_hdr(req, "Content-Type", "text/plain");
-            httpd_resp_set_hdr(req , "Autherization" , make_auth_token());
+            login_flag = true;
 
             // Send the header with a NULL payload and length 0
             httpd_resp_send(req, NULL, 0);          
@@ -68,17 +71,44 @@ static esp_err_t echo_post_handler(httpd_req_t *req)
 esp_err_t dashboard_handler(httpd_req_t *req)
 {
     int response;
-    char auth_token[50];
-    //if (httpd_req_get_hdr_value_str(req , "Autherization", auth_token , 50) == ESP_OK){
+    const char* un_authMsg = "Please login first";
+    ESP_LOGI("logs" , "login flag: %d" , login_flag);
+
+    
+    if (login_flag){
     response = httpd_resp_send(req, dashboard, HTTPD_RESP_USE_STRLEN);
     return response;
-    // }else {
-    //     httpd_resp_send_404(req);
-  
-    // }
+    }
+    else {
+    response = httpd_resp_send(req, un_authMsg, HTTPD_RESP_USE_STRLEN);
+    return response;
+
+
+    }
 
     return ESP_OK;
 
+}
+
+esp_err_t logout_handler(httpd_req_t *req){
+    login_flag = false;
+    ESP_LOGI("logs" , "login flag: %d" , login_flag);
+    int response;
+   
+    response = httpd_resp_send(req, NULL , 0);
+    return response;
+}
+
+esp_err_t get_network(httpd_req_t *req){
+    int response;
+    cJSON *root;
+	root = cJSON_CreateObject();
+	cJSON_AddStringToObject(root, "ip", "asdfasdf");
+	cJSON_AddStringToObject(root, "mac", "sdfsdf");
+	const char *my_json_string = cJSON_Print(root);
+
+    response = httpd_resp_send(req , my_json_string , HTTPD_RESP_USE_STRLEN);
+    return response;
 }
 
 void swh_server_init()
@@ -89,52 +119,52 @@ void swh_server_init()
     ESP_LOGI(HTTP_SERVER_TAG, "Starting server on port: '%d'", server_config.server_port);
 
     if (httpd_start(&server_handle, &server_config) == ESP_OK){
-        httpd_uri_t uri_led_color = {
+        httpd_uri_t uri_login = {
             .uri = "/login",
             .method = HTTP_GET,
             .handler = login_page,
             .user_ctx = NULL
         };
 
-        httpd_register_uri_handler(server_handle, &uri_led_color);
+        httpd_register_uri_handler(server_handle, &uri_login);
 
-        httpd_uri_t uri_off = {
+        httpd_uri_t uri_get_data = {
         .uri = "/getData",
         .method = HTTP_POST,
         .handler = echo_post_handler,
         .user_ctx = NULL
         };
 
-        httpd_register_uri_handler(server_handle, &uri_off);
+        httpd_register_uri_handler(server_handle, &uri_get_data);
 
 
-        httpd_uri_t uri_buzzer_on = {
+        httpd_uri_t uri_dashboard = {
             .uri = "/dashboard",
             .method = HTTP_GET,
             .handler = dashboard_handler,
             .user_ctx = NULL
         };
 
-        httpd_register_uri_handler(server_handle , &uri_buzzer_on);
+        httpd_register_uri_handler(server_handle , &uri_dashboard);
 
 
-        // httpd_uri_t uri_buzzer_off = {
-        //     .uri = "/buzzer/off",
-        //     .method = HTTP_GET,
-        //     .handler = buzzer_off,
-        //     .user_ctx = NULL
-        // };
+       httpd_uri_t uri_logout = {
+            .uri = "/logout",
+            .method = HTTP_GET,
+            .handler = logout_handler,
+            .user_ctx = NULL
+        };
 
-        // httpd_register_uri_handler(server_handle , &uri_buzzer_off);
+        httpd_register_uri_handler(server_handle , &uri_logout);
 
-        // httpd_uri_t uri_system_info = {
-        //     .uri = "/GetSystemInfo",
-        //     .method = HTTP_GET,
-        //     .handler = get_system_info,
-        //     .user_ctx = NULL
-        // };
+        httpd_uri_t uri_network = {
+            .uri = "/network",
+            .method = HTTP_GET,
+            .handler = get_network,
+            .user_ctx = NULL
+        };
 
-       // httpd_register_uri_handler(server_handle , &uri_system_info);
+       httpd_register_uri_handler(server_handle , &uri_network);
     }
     else{
         ESP_LOGI(HTTP_SERVER_TAG, "Error starting server!");
