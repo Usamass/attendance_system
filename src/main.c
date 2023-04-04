@@ -32,7 +32,8 @@
 QueueHandle_t mailBox;
 QueueHandle_t spiffs_mailBox;
 extern device_config_t dConfig; // device ip and mac will be set on connect to network
-
+EventGroupHandle_t spiffs_event_group;
+  
 #define EXAMPLE_ESP_MAXIMUM_RETRY (5)
 #define EXAMPLE_HTTP_QUERY_KEY_MAX_LEN (64)
 #define MAX_HTTP_OUTPUT_BUFFER (1000)
@@ -262,7 +263,7 @@ static void db_interface_task()
             DataSource_t dataSrc = DEVICE_CONFIGS;
             spiffs_noti.data_scr = dataSrc;
             spiffs_noti.flag_type = DEVICE_CONFIG_WRITE_FLAG;
-            spiffs_noti.data = UI_request_buffer;
+            spiffs_noti.data = device_config_buffer;
 
             mailBox_status = xQueueSend(spiffs_mailBox, &spiffs_noti, portMAX_DELAY);
             if (mailBox_status != pdPASS)

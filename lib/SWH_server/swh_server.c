@@ -1,11 +1,14 @@
 #include "esp_log.h"
 #include "esp_http_server.h"
+#include "freertos/event_groups.h"
 #include "device_configs.h" // for getting mac address or setting device configs.
 #include "cJSON.h"
 #include "swh_server.h"
 #include "../SWH_web_pages.h"
 #include "user_login_data.h"
 #include "device_configs.h"
+#include "../SWH_eventGroups.h"
+#include "../event_bits.h"
 
 extern device_config_t dConfig;
 
@@ -101,15 +104,77 @@ esp_err_t logout_handler(httpd_req_t *req){
 
 esp_err_t get_network(httpd_req_t *req){
     int response;
+    const char* un_authMsg = "Please login first";
+    ESP_LOGI("logs" , "login flag: %d" , login_flag);
+    if (login_flag){
     cJSON *root;
 	root = cJSON_CreateObject();
-	cJSON_AddStringToObject(root, "ip", "asdfasdf");
-	cJSON_AddStringToObject(root, "mac", "sdfsdf");
+	cJSON_AddStringToObject(root, "ip", getIpAddr(&dConfig));
+	cJSON_AddStringToObject(root, "mac", getMacAddr(&dConfig));
 	const char *my_json_string = cJSON_Print(root);
 
     response = httpd_resp_send(req , my_json_string , HTTPD_RESP_USE_STRLEN);
     return response;
+    }
+    else {
+        response = httpd_resp_send(req, un_authMsg, HTTPD_RESP_USE_STRLEN);
+        return response;
+
+    }
+
 }
+
+esp_err_t get_device_configs(httpd_req_t* req)
+{
+    char buf[100];
+    int response;
+
+    char* device_id = NULL;
+    char* auth_token = NULL;
+    char* device_location = NULL;
+    char* location_id = NULL;
+
+    int ret, remaining = req->content_len;
+
+    while (remaining > 0) {
+        /* Read the data for the request */
+        if ((ret = httpd_req_recv(req, buf,
+                        MIN(remaining, sizeof(buf)))) <= 0) {
+            if (ret == HTTPD_SOCK_ERR_TIMEOUT) {
+                /* Retry receiving if timeout occurred */
+                continue;
+            }
+            return ESP_FAIL;
+        }
+        ESP_LOGI(JSON_TAG, "Deserialize the reponse");
+        cJSON *root2 = cJSON_Parse(buf);
+        if (cJSON_GetObjectItem(root2, "device_id")) {
+            device_id = cJSON_GetObjectItem(root2,"device_id")->valuestring;
+            ESP_LOGI(JSON_TAG, "device_id=%s",device_id);
+        }
+        if (cJSON_GetObjectItem(root2, "auth_token")) {
+            auth_token = cJSON_GetObjectItem(root2,"auth_token")->valuestring;
+            ESP_LOGI(JSON_TAG, "auth_token=%s",auth_token);
+        }
+        if (cJSON_GetObjectItem(root2, "device_location")) {
+            device_location = cJSON_GetObjectItem(root2,"device_location")->valuestring;
+            ESP_LOGI(JSON_TAG, "device_location=%s",device_location);
+        }
+        if (cJSON_GetObjectItem(root2, "location_id")) {
+            location_id = cJSON_GetObjectItem(root2,"location_id")->valuestring;
+            ESP_LOGI(JSON_TAG, "location_id=%s",location_id);
+        }
+
+    }
+    //xEventGroupSetBits(spiffs_event_group , DEVICE_CONFIG_BIT);
+    response = httpd_resp_send(req, "done" , HTTPD_RESP_USE_STRLEN);
+    return response;
+
+
+
+
+}
+
 
 void swh_server_init()
 {
@@ -165,6 +230,16 @@ void swh_server_init()
         };
 
        httpd_register_uri_handler(server_handle , &uri_network);
+
+
+        httpd_uri_t uri_get_configs = {
+            .uri = "/getDeviceConfigs",
+            .method = HTTP_POST,
+            .handler = get_device_configs,
+            .user_ctx = NULL
+        };
+
+       httpd_register_uri_handler(server_handle , &uri_get_configs);
     }
     else{
         ESP_LOGI(HTTP_SERVER_TAG, "Error starting server!");
