@@ -1,3 +1,4 @@
+#include <stdlib.h>
 #include "esp_log.h"
 #include "esp_http_server.h"
 #include "freertos/event_groups.h"
@@ -29,6 +30,7 @@ static esp_err_t echo_post_handler(httpd_req_t *req)
     char buf[100];
     char* username = NULL;
     char* password = NULL;
+    cJSON* root2 = NULL;
     user_credentials* usr = usr_data_init();
     int ret, remaining = req->content_len;
 
@@ -43,7 +45,7 @@ static esp_err_t echo_post_handler(httpd_req_t *req)
             return ESP_FAIL;
         }
         ESP_LOGI(JSON_TAG, "Deserialize the reponse");
-        cJSON *root2 = cJSON_Parse(buf);
+        root2 = cJSON_Parse(buf);
         if (cJSON_GetObjectItem(root2, "username")) {
             username = cJSON_GetObjectItem(root2,"username")->valuestring;
             ESP_LOGI(JSON_TAG, "username=%s",username);
@@ -68,6 +70,7 @@ static esp_err_t echo_post_handler(httpd_req_t *req)
 
     }
 
+    cJSON_Delete(root2);
 
     return ESP_OK;
 }
@@ -112,7 +115,7 @@ esp_err_t get_network(httpd_req_t *req){
 	cJSON_AddStringToObject(root, "ip", getIpAddr(&dConfig));
 	cJSON_AddStringToObject(root, "mac", getMacAddr(&dConfig));
 	const char *my_json_string = cJSON_Print(root);
-
+    cJSON_Delete(root);
     response = httpd_resp_send(req , my_json_string , HTTPD_RESP_USE_STRLEN);
     return response;
     }
@@ -126,8 +129,8 @@ esp_err_t get_network(httpd_req_t *req){
 
 esp_err_t get_device_configs(httpd_req_t* req)
 {
-    char buf[100];
-    int response;
+    char buf[200];
+    cJSON* root2 = NULL;
 
     char* device_id = NULL;
     char* auth_token = NULL;
@@ -147,7 +150,7 @@ esp_err_t get_device_configs(httpd_req_t* req)
             return ESP_FAIL;
         }
         ESP_LOGI(JSON_TAG, "Deserialize the reponse");
-        cJSON *root2 = cJSON_Parse(buf);
+        root2 = cJSON_Parse(buf);
         if (cJSON_GetObjectItem(root2, "device_id")) {
             device_id = cJSON_GetObjectItem(root2,"device_id")->valuestring;
             ESP_LOGI(JSON_TAG, "device_id=%s",device_id);
@@ -164,11 +167,17 @@ esp_err_t get_device_configs(httpd_req_t* req)
             location_id = cJSON_GetObjectItem(root2,"location_id")->valuestring;
             ESP_LOGI(JSON_TAG, "location_id=%s",location_id);
         }
+        /* setting all the parameters of device configs*/
+        setDeviceId(&dConfig , device_id);
+        setAuthToken(&dConfig , auth_token);
+        setDeviceLocation(&dConfig , device_location);
+        setLocationId(&dConfig , atoi(location_id));
+
+        xEventGroupSetBits(spiffs_event_group , DEVICE_CONFIG_BIT);
 
     }
-    //xEventGroupSetBits(spiffs_event_group , DEVICE_CONFIG_BIT);
-    response = httpd_resp_send(req, "done" , HTTPD_RESP_USE_STRLEN);
-    return response;
+    cJSON_Delete(root2);
+    return ESP_OK;
 
 
 

@@ -24,11 +24,13 @@ typedef struct
 
 void setDeviceId(device_config_t* , const char*);
 void setLocationId(device_config_t* , const int);
+void setDeviceLocation(device_config_t* , const char*);
 void setAuthToken(device_config_t* , const char*);
 void setMacAddr(device_config_t* , uint8_t*);
 void setIpAddr(device_config_t* , const esp_netif_ip_info_t*);
 const char* getDeviceId(device_config_t*);
 int getLocationId(device_config_t*);
+const char* getDeviceLocation(device_config_t*);
 const char* getAuthToken(device_config_t*);
 const char* getMacAddr(device_config_t*);
 const char* getIpAddr(device_config_t*);

@@ -23,6 +23,7 @@
 #include "../SWH_data_buffers.h"
 #include "device_configs.h"
 #include "swh_file_system.h"
+#include "swh_utility.h"
 
 
 // static const char *ETH_TAG = "SWH_eth_test";
@@ -36,7 +37,6 @@ EventGroupHandle_t spiffs_event_group;
   
 #define EXAMPLE_ESP_MAXIMUM_RETRY (5)
 #define EXAMPLE_HTTP_QUERY_KEY_MAX_LEN (64)
-#define MAX_HTTP_OUTPUT_BUFFER (1000)
 #define MIN(a, b) (((a) < (b)) ? (a) : (b))
 
 static const char *HTTP_CLIENT_TAG = "http client";
@@ -155,6 +155,7 @@ static void networkStatusTask(void *pvParameter)
             noti.val = GOT_IP_FLAG;
             noti.msg = "got ip address";
             swh_server_init();
+            //xEventGroupSetBits(spiffs_event_group , CLIENT_RECIEVED_BIT);
 
             // getStudentsData(dConfig);
 
@@ -263,7 +264,7 @@ static void db_interface_task()
             DataSource_t dataSrc = DEVICE_CONFIGS;
             spiffs_noti.data_scr = dataSrc;
             spiffs_noti.flag_type = DEVICE_CONFIG_WRITE_FLAG;
-            spiffs_noti.data = device_config_buffer;
+            spiffs_noti.data = serialize_it(&dConfig);
 
             mailBox_status = xQueueSend(spiffs_mailBox, &spiffs_noti, portMAX_DELAY);
             if (mailBox_status != pdPASS)
@@ -284,7 +285,7 @@ static void spiffs_task()
         mailBox_status = xQueueReceive(spiffs_mailBox, &spiffs_noti, portMAX_DELAY);
         if (mailBox_status == pdPASS)
         {
-            ESP_LOGI(MAILBOX_TAG, "data received form : %d \t data = %s \n", spiffs_noti.data_scr, spiffs_noti.data);
+            ESP_LOGI(MAILBOX_TAG, "data received from : %d \t data = %s \n", spiffs_noti.data_scr, spiffs_noti.data);
             if (spiffs_noti.data_scr == CLIENT)
             {
                 if (spiffs_noti.flag_type == CLIENT_WRITE_FLAG)
@@ -375,7 +376,12 @@ void app_main(void)
     swh_eth_init();         // initializing ethernet hardware.
     swh_file_system_init(); // initializing file system.
     spiffs_event_group = xEventGroupCreate();
-    xEventGroupClearBits(spiffs_event_group, CLIENT_RECIEVED_BIT | SPIFFS_OPERATION_DONE);
+    xEventGroupClearBits(
+        spiffs_event_group, 
+        CLIENT_RECIEVED_BIT | 
+        SPIFFS_OPERATION_DONE | 
+        DEVICE_CONFIG_BIT
+    );
 
     xTaskCreate(networkStatusTask, "network status task", 4000, NULL, 1, NULL);
     mailBox = xQueueCreate(1, sizeof(NOTIFIER)); // creating mailbox with 1 NOTIFIER space.

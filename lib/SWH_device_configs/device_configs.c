@@ -40,6 +40,13 @@ int getLocationId(device_config_t* dConfig)
     return dConfig->location_id;
 }
 
+void setDeviceLocation(device_config_t* dConfig , const char* l_name)
+{
+    int l_name_len = strlen(l_name);
+
+    dConfig->location_name = (char*)malloc(l_name_len * sizeof(char));
+    memcpy(dConfig->location_name , l_name , l_name_len +1);}
+
 void setAuthToken(device_config_t* dConfig , const char* token)
 {
     int token_len = strlen(token);
