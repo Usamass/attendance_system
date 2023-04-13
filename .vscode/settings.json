@@ -7,7 +7,18 @@
         "swh_server.h": "c",
         "user_login_data.h": "c",
         "esp_netif.h": "c",
-        "device_configs.h": "c"
+        "device_configs.h": "c",
+        "*.tcc": "c",
+        "chrono": "c",
+        "limits": "c",
+        "type_traits": "c",
+        "ctime": "c",
+        "future": "c",
+        "numeric": "c",
+        "ratio": "c",
+        "streambuf": "c",
+        "tuple": "c",
+        "utility": "c"
     },
     "C_Cpp.errorSquiggles": "disabled"
 }

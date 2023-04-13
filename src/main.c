@@ -35,9 +35,9 @@ QueueHandle_t spiffs_mailBox;
 extern device_config_t dConfig; // device ip and mac will be set on connect to network
 EventGroupHandle_t spiffs_event_group;
   
-#define EXAMPLE_ESP_MAXIMUM_RETRY (5)
-#define EXAMPLE_HTTP_QUERY_KEY_MAX_LEN (64)
-#define MIN(a, b) (((a) < (b)) ? (a) : (b))
+// #define EXAMPLE_ESP_MAXIMUM_RETRY (5)
+// #define EXAMPLE_HTTP_QUERY_KEY_MAX_LEN (64)
+// #define MIN(a, b) (((a) < (b)) ? (a) : (b))
 
 static const char *HTTP_CLIENT_TAG = "http client";
 static const char *MAILBOX_TAG = "mailbox";
@@ -45,96 +45,96 @@ static const char *TAG_exe = "spiffs";
 // static const char *JSON_TAG = "JSON";
 // ------------------------------------ ESP_HTTP_CLIENT_EVENT_HANDLER---------------------------
 
-esp_err_t _http_event_handler(esp_http_client_event_t *evt)
-{
-    static char *output_buffer; // Buffer to store response of http request from event handler
-    static int output_len;      // Stores number of bytes read
-    switch (evt->event_id)
-    {
-    case HTTP_EVENT_ERROR:
-        ESP_LOGI(HTTP_CLIENT_TAG, "HTTP_EVENT_ERROR");
-        break;
-    case HTTP_EVENT_ON_CONNECTED:
-        ESP_LOGI(HTTP_CLIENT_TAG, "HTTP_EVENT_ON_CONNECTED");
-        break;
-    case HTTP_EVENT_HEADER_SENT:
-        ESP_LOGI(HTTP_CLIENT_TAG, "HTTP_EVENT_HEADER_SENT");
-        break;
-    case HTTP_EVENT_ON_HEADER:
-        ESP_LOGI(HTTP_CLIENT_TAG, "HTTP_EVENT_ON_HEADER, key=%s, value=%s", evt->header_key, evt->header_value);
-        break;
-    case HTTP_EVENT_ON_DATA:
-        ESP_LOGI(HTTP_CLIENT_TAG, "HTTP_EVENT_ON_DATA, len=%d", evt->data_len);
-        ESP_LOGI(HTTP_CLIENT_TAG, "HTTP_RESPONSE_DATA: %s \n", (char *)evt->data);
-        /*
-         *  Check for chunked encoding is added as the URL for chunked encoding used in this example returns binary data.
-         *  However, event handler can also be used in case chunked encoding is used.
-         */
-        if (!esp_http_client_is_chunked_response(evt->client))
-        {
-            // If user_data buffer is configured, copy the response into the buffer
-            int copy_len = 0;
-            if (evt->user_data)
-            {
-                copy_len = MIN(evt->data_len, (MAX_HTTP_OUTPUT_BUFFER - output_len));
-                if (copy_len)
-                {
-                    memcpy(evt->user_data + output_len, evt->data, copy_len);
-                }
-            }
-            else
-            {
-                const int buffer_len = esp_http_client_get_content_length(evt->client);
-                if (output_buffer == NULL)
-                {
-                    output_buffer = (char *)malloc(buffer_len);
-                    output_len = 0;
-                    if (output_buffer == NULL)
-                    {
-                        ESP_LOGE(HTTP_CLIENT_TAG, "Failed to allocate memory for output buffer");
-                        return ESP_FAIL;
-                    }
-                }
-                copy_len = MIN(evt->data_len, (buffer_len - output_len));
-                if (copy_len)
-                {
-                    memcpy(output_buffer + output_len, evt->data, copy_len);
-                }
-            }
-            output_len += copy_len;
-        }
+// esp_err_t _http_event_handler(esp_http_client_event_t *evt)
+// {
+//     static char *output_buffer; // Buffer to store response of http request from event handler
+//     static int output_len;      // Stores number of bytes read
+//     switch (evt->event_id)
+//     {
+//     case HTTP_EVENT_ERROR:
+//         ESP_LOGI(HTTP_CLIENT_TAG, "HTTP_EVENT_ERROR");
+//         break;
+//     case HTTP_EVENT_ON_CONNECTED:
+//         ESP_LOGI(HTTP_CLIENT_TAG, "HTTP_EVENT_ON_CONNECTED");
+//         break;
+//     case HTTP_EVENT_HEADER_SENT:
+//         ESP_LOGI(HTTP_CLIENT_TAG, "HTTP_EVENT_HEADER_SENT");
+//         break;
+//     case HTTP_EVENT_ON_HEADER:
+//         ESP_LOGI(HTTP_CLIENT_TAG, "HTTP_EVENT_ON_HEADER, key=%s, value=%s", evt->header_key, evt->header_value);
+//         break;
+//     case HTTP_EVENT_ON_DATA:
+//         ESP_LOGI(HTTP_CLIENT_TAG, "HTTP_EVENT_ON_DATA, len=%d", evt->data_len);
+//         ESP_LOGI(HTTP_CLIENT_TAG, "HTTP_RESPONSE_DATA: %s \n", (char *)evt->data);
+//         /*
+//          *  Check for chunked encoding is added as the URL for chunked encoding used in this example returns binary data.
+//          *  However, event handler can also be used in case chunked encoding is used.
+//          */
+//         if (!esp_http_client_is_chunked_response(evt->client))
+//         {
+//             // If user_data buffer is configured, copy the response into the buffer
+//             int copy_len = 0;
+//             if (evt->user_data)
+//             {
+//                 copy_len = MIN(evt->data_len, (MAX_HTTP_OUTPUT_BUFFER - output_len));
+//                 if (copy_len)
+//                 {
+//                     memcpy(evt->user_data + output_len, evt->data, copy_len);
+//                 }
+//             }
+//             else
+//             {
+//                 const int buffer_len = esp_http_client_get_content_length(evt->client);
+//                 if (output_buffer == NULL)
+//                 {
+//                     output_buffer = (char *)malloc(buffer_len);
+//                     output_len = 0;
+//                     if (output_buffer == NULL)
+//                     {
+//                         ESP_LOGE(HTTP_CLIENT_TAG, "Failed to allocate memory for output buffer");
+//                         return ESP_FAIL;
+//                     }
+//                 }
+//                 copy_len = MIN(evt->data_len, (buffer_len - output_len));
+//                 if (copy_len)
+//                 {
+//                     memcpy(output_buffer + output_len, evt->data, copy_len);
+//                 }
+//             }
+//             output_len += copy_len;
+//         }
 
-        break;
-    case HTTP_EVENT_ON_FINISH:
-        ESP_LOGI(HTTP_CLIENT_TAG, "HTTP_EVENT_ON_FINISH");
-        if (output_buffer != NULL)
-        {
-            // Response is accumulated in output_buffer. Uncomment the below line to print the accumulated response
-            // ESP_LOG_BUFFER_HEX(TAG, output_buffer, output_len);
-            free(output_buffer);
-            output_buffer = NULL;
-        }
-        output_len = 0;
-        break;
-    case HTTP_EVENT_DISCONNECTED:
-        ESP_LOGI(HTTP_CLIENT_TAG, "HTTP_EVENT_DISCONNECTED");
+//         break;
+//     case HTTP_EVENT_ON_FINISH:
+//         ESP_LOGI(HTTP_CLIENT_TAG, "HTTP_EVENT_ON_FINISH");
+//         if (output_buffer != NULL)
+//         {
+//             // Response is accumulated in output_buffer. Uncomment the below line to print the accumulated response
+//             // ESP_LOG_BUFFER_HEX(TAG, output_buffer, output_len);
+//             free(output_buffer);
+//             output_buffer = NULL;
+//         }
+//         output_len = 0;
+//         break;
+//     case HTTP_EVENT_DISCONNECTED:
+//         ESP_LOGI(HTTP_CLIENT_TAG, "HTTP_EVENT_DISCONNECTED");
 
-        if (output_buffer != NULL)
-        {
-            free(output_buffer);
-            output_buffer = NULL;
-        }
-        output_len = 0;
-        break;
-    case HTTP_EVENT_REDIRECT:
-        ESP_LOGI(HTTP_CLIENT_TAG, "HTTP_EVENT_REDIRECT");
-        esp_http_client_set_header(evt->client, "From", "user@example.com");
-        esp_http_client_set_header(evt->client, "Accept", "text/html");
-        esp_http_client_set_redirection(evt->client);
-        break;
-    }
-    return ESP_OK;
-}
+//         if (output_buffer != NULL)
+//         {
+//             free(output_buffer);
+//             output_buffer = NULL;
+//         }
+//         output_len = 0;
+//         break;
+//     case HTTP_EVENT_REDIRECT:
+//         ESP_LOGI(HTTP_CLIENT_TAG, "HTTP_EVENT_REDIRECT");
+//         esp_http_client_set_header(evt->client, "From", "user@example.com");
+//         esp_http_client_set_header(evt->client, "Accept", "text/html");
+//         esp_http_client_set_redirection(evt->client);
+//         break;
+//     }
+//     return ESP_OK;
+// }
 //------------------------------This task will notify network status------------------------------------------------------
 
 static void networkStatusTask(void *pvParameter)
