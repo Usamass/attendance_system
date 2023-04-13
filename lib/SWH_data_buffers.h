@@ -1,5 +1,8 @@
 // all data buffers are defined here.
+#ifndef _DATA_BUFFER_H
+#define _DATA_BUFFER_H
 #include <stdio.h>
 #define MAX_HTTP_OUTPUT_BUFFER (1000)
 
-char* client_receive_buffer = NULL;
+extern char* client_receive_buffer;
+#endif /*_DATA_BUFFER_H*/

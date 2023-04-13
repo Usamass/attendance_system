@@ -1,6 +1,7 @@
 #include "swh_client.h"
-static const char *HTTP_CLIENT_TAG = "http client";
+char* client_receive_buffer = NULL;
 
+static const char *HTTP_CLIENT_TAG = "http client";
 
 esp_err_t _http_event_handler(esp_http_client_event_t *evt)
 {
@@ -94,33 +95,28 @@ esp_err_t _http_event_handler(esp_http_client_event_t *evt)
 }
 
 
-esp_err_t getStudentsData(device_config_t dConfig)
+esp_err_t getStudentsData(/*device_config_t dConfig*/)
 {
     // const int locationID = getLocationId(&dConfig);
     // const char *auth = getAuthToken(&dConfig);
 
-    // char local_response_buffer[MAX_HTTP_OUTPUT_BUFFER];
+    int locationID = 1;
     client_receive_buffer = (char *)malloc(MAX_HTTP_OUTPUT_BUFFER * sizeof(char));
 
     esp_err_t err;
-    // making query string.
-    // char queryString[15];
-    // char url[100];
-    // snprintf(url, sizeof(url), "http://192.168.50.209:8000/api/students?location=%d", locationID);
-    // snprintf(url, sizeof(queryString), "location=%d", locationID);
+    
+    snprintf(url, sizeof(url), "http://192.168.50.209:8000/api/students/location/%d", locationID);
 
     esp_http_client_config_t config = {
-        .host = "2a85849f-67d6-40e7-a2cc-87c61ef2ac71.mock.pstmn.io",
-        .path = "/getStudentData",
-        // .query = queryString,
-        // .url = "https://2a85849f-67d6-40e7-a2cc-87c61ef2ac71.mock.pstmn.io/getStudentData",
+        .host = "192.168.50.209",
+        .url = url,
         .method = HTTP_METHOD_GET,
         .event_handler = _http_event_handler,
         .user_data = client_receive_buffer, // Pass address of local buffer to get response
         .disable_auto_redirect = true,
     };
     esp_http_client_handle_t client = esp_http_client_init(&config);
-    esp_http_client_set_header(client, "token", auth);
+    esp_http_client_set_header(client, "token", "zQJ9Xc4nutxSY0v");
 
     // GET
     err = esp_http_client_perform(client);
