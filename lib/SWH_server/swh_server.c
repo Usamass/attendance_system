@@ -8,6 +8,7 @@
 #include "../SWH_web_pages.h"
 #include "user_login_data.h"
 #include "device_configs.h"
+#include "swh_client.h"
 #include "../SWH_eventGroups.h"
 #include "../event_bits.h"
 

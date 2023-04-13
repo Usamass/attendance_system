@@ -7,7 +7,8 @@
         "swh_server.h": "c",
         "user_login_data.h": "c",
         "esp_netif.h": "c",
-        "device_configs.h": "c"
+        "device_configs.h": "c",
+        "stdio.h": "c"
     },
     "C_Cpp.errorSquiggles": "disabled"
 }
