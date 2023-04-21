@@ -12,6 +12,6 @@
 #define EXAMPLE_HTTP_QUERY_KEY_MAX_LEN (64)
 #define MIN(a, b) (((a) < (b)) ? (a) : (b))
 
-esp_err_t getStudentsData(/*device_config_t*/);
+esp_err_t getStudentsData(device_config_t);
 
-
+#endif

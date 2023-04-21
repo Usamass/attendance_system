@@ -95,13 +95,14 @@ esp_err_t _http_event_handler(esp_http_client_event_t *evt)
 }
 
 
-esp_err_t getStudentsData(/*device_config_t dConfig*/)
+esp_err_t getStudentsData(device_config_t dConfig)
 {
-    // const int locationID = getLocationId(&dConfig);
-    // const char *auth = getAuthToken(&dConfig);
+    const int locationID = getLocationId(&dConfig);
+    const char *auth = getAuthToken(&dConfig);
 
-    int locationID = 1;
+   // client_receive_buffer[MAX_HTTP_OUTPUT_BUFFER];
     client_receive_buffer = (char *)malloc(MAX_HTTP_OUTPUT_BUFFER * sizeof(char));
+    char url[70] = {0};
 
     esp_err_t err;
     
@@ -109,6 +110,8 @@ esp_err_t getStudentsData(/*device_config_t dConfig*/)
 
     esp_http_client_config_t config = {
         .host = "192.168.50.209",
+        // .host = "2a85849f-67d6-40e7-a2cc-87c61ef2ac71.mock.pstmn.io",
+        // .path = "/getStudentData",
         .url = url,
         .method = HTTP_METHOD_GET,
         .event_handler = _http_event_handler,
@@ -116,7 +119,7 @@ esp_err_t getStudentsData(/*device_config_t dConfig*/)
         .disable_auto_redirect = true,
     };
     esp_http_client_handle_t client = esp_http_client_init(&config);
-    esp_http_client_set_header(client, "token", "zQJ9Xc4nutxSY0v");
+    esp_http_client_set_header(client, "token", auth);
 
     // GET
     err = esp_http_client_perform(client);
@@ -129,7 +132,7 @@ esp_err_t getStudentsData(/*device_config_t dConfig*/)
                  esp_http_client_get_content_length(client));
         if (status_code == 200)
         {
-            xEventGroupSetBits(spiffs_event_group, CLIENT_RECIEVED_BIT);
+            //xEventGroupSetBits(spiffs_event_group, CLIENT_RECIEVED_BIT);
         }
     }
     else

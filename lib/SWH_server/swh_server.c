@@ -9,10 +9,14 @@
 #include "user_login_data.h"
 #include "device_configs.h"
 #include "swh_client.h"
+#include "../SWH_data_buffers.h"
 #include "../SWH_eventGroups.h"
 #include "../event_bits.h"
 
 extern device_config_t dConfig;
+
+const char stdData[] = "[{\"id\":12,\"name\":\"mahnoo\",\"user_name\":\"bc123456789\"},{\"id\":13,\"name\":\"hfkgdfgka\",\"user_name\":\"adlhglhlaghl\"},{\"id\":14,\"name\":\"dhfaghjhakv,\",\"user_name\":\"adlhglhhflhjvk\"},{\"id\":16,\"name\":\"Prof. Sterling Brakus\",\"user_name\":\"gino.hoeger\"},{\"id\":17,\"name\":\"Miss Naomi Kunze\",\"user_name\":\"treutel.sammy\"},{\"id\":22,\"name\":\"Victor Senger II\",\"user_name\":\"moshe.thompson\"}]";
+
 
 static char* HTTP_SERVER_TAG = "server tag";
 static char* JSON_TAG = "json tag";
@@ -173,10 +177,9 @@ esp_err_t get_device_configs(httpd_req_t* req)
         setAuthToken(&dConfig , auth_token);
         setDeviceLocation(&dConfig , device_location);
         setLocationId(&dConfig , atoi(location_id));
-
-        xEventGroupSetBits(spiffs_event_group , DEVICE_CONFIG_BIT);
-
+        xEventGroupSetBits(spiffs_event_group , DEVICE_CONFIG_BIT); // test it outside the while loop
     }
+
     cJSON_Delete(root2);
     return ESP_OK;
 
@@ -184,6 +187,64 @@ esp_err_t get_device_configs(httpd_req_t* req)
 
 
 }
+
+esp_err_t enrollment_page(httpd_req_t* req){
+    int response;
+    response = httpd_resp_send(req , enrollmentPage , HTTPD_RESP_USE_STRLEN);
+    return response;
+
+
+
+}
+esp_err_t get_std_data(httpd_req_t* req){
+    int response;
+    getStudentsData(dConfig);
+    // ESP_LOGI("inside server get_std_data" , "%s" , client_receive_buffer);  // bug is here!
+
+    response = httpd_resp_send(req , client_receive_buffer , HTTPD_RESP_USE_STRLEN);
+    return response;
+}
+
+esp_err_t get_date_time(httpd_req_t* req){
+    char buf[50];
+    int response;
+
+    char* date = NULL;
+    char* time = NULL;
+    
+    int ret, remaining = req->content_len;
+
+    while (remaining > 0) {
+        /* Read the data for the request */
+        if ((ret = httpd_req_recv(req, buf,
+                        MIN(remaining, sizeof(buf)))) <= 0) {
+            if (ret == HTTPD_SOCK_ERR_TIMEOUT) {
+                /* Retry receiving if timeout occurred */
+                continue;
+            }
+            return ESP_FAIL;
+        }
+        ESP_LOGI(JSON_TAG, "Deserialize the reponse");
+        cJSON *root2 = cJSON_Parse(buf);
+        if (cJSON_GetObjectItem(root2, "date")) {
+            date = cJSON_GetObjectItem(root2,"date")->valuestring;
+            ESP_LOGI(JSON_TAG, "date=%s",date);
+        }
+        if (cJSON_GetObjectItem(root2, "time")) {
+            time = cJSON_GetObjectItem(root2,"time")->valuestring;
+            ESP_LOGI(JSON_TAG, "time=%s",time);
+        }
+
+    }
+     
+
+
+    response = httpd_resp_send(req , NULL , 0);
+    return response;
+
+
+}
+
 
 
 void swh_server_init()
@@ -242,6 +303,16 @@ void swh_server_init()
        httpd_register_uri_handler(server_handle , &uri_network);
 
 
+       httpd_uri_t uri_get_std_data = {
+            .uri = "/getStdData",
+            .method = HTTP_GET,
+            .handler = get_std_data,
+            .user_ctx = NULL
+        };
+
+        httpd_register_uri_handler(server_handle , &uri_get_std_data); 
+
+
         httpd_uri_t uri_get_configs = {
             .uri = "/getDeviceConfigs",
             .method = HTTP_POST,
@@ -249,7 +320,29 @@ void swh_server_init()
             .user_ctx = NULL
         };
 
-       httpd_register_uri_handler(server_handle , &uri_get_configs);
+        httpd_register_uri_handler(server_handle , &uri_get_configs);
+
+    //    httpd_uri_t uri_get_date_time = {
+    //         .uri = "/dateTime",
+    //         .method = HTTP_POST,
+    //         .handler = get_date_time,
+    //         .user_ctx = NULL
+    //     };
+
+    //    httpd_register_uri_handler(server_handle , &uri_get_date_time);
+
+       httpd_uri_t uri_get_enrollment = {
+            .uri = "/enrollment",
+            .method = HTTP_GET,
+            .handler = enrollment_page,
+            .user_ctx = NULL
+        };
+
+       httpd_register_uri_handler(server_handle , &uri_get_enrollment);
+
+        
+
+
     }
     else{
         ESP_LOGI(HTTP_SERVER_TAG, "Error starting server!");

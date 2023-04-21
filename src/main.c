@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <esp_eth_enc28j60.h>
+#include <ds1307.h>
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "esp_netif.h"
@@ -35,6 +36,16 @@ QueueHandle_t mailBox;
 QueueHandle_t spiffs_mailBox;
 extern device_config_t dConfig; // device ip and mac will be set on connect to network
 EventGroupHandle_t spiffs_event_group;
+
+i2c_dev_t dev;
+struct tm mytime = {
+        .tm_year = 123, //(2022 - 1900)
+        .tm_mon  = 04,  
+        .tm_mday = 10,
+        .tm_hour = 8,
+        .tm_min  = 33,
+        .tm_sec  = 30
+    };
   
 // #define EXAMPLE_ESP_MAXIMUM_RETRY (5)
 // #define EXAMPLE_HTTP_QUERY_KEY_MAX_LEN (64)
@@ -65,7 +76,8 @@ static void networkStatusTask(void *pvParameter)
             noti.val = GOT_IP_FLAG;
             noti.msg = "got ip address";
             swh_server_init();
-            getStudentsData();
+            //getStudentsData(dConfig);
+
             
             mailBox_status = xQueueSend(mailBox, &noti, portMAX_DELAY);
             if (mailBox_status != pdPASS)
@@ -283,6 +295,11 @@ void app_main(void)
     rgbConfig();
     swh_eth_init();         // initializing ethernet hardware.
     swh_file_system_init(); // initializing file system.
+    ESP_ERROR_CHECK(i2cdev_init());
+    memset(&dev, 0, sizeof(i2c_dev_t));
+    ESP_ERROR_CHECK(ds1307_init_desc(&dev, 0, 21, 22));
+    ESP_ERROR_CHECK(ds1307_set_time(&dev, &mytime)); 
+
     spiffs_event_group = xEventGroupCreate();
     xEventGroupClearBits(
         spiffs_event_group, 
