@@ -1,4 +1,5 @@
 #include <stdlib.h>
+#include <sys/socket.h>
 #include "esp_log.h"
 #include "esp_http_server.h"
 #include "freertos/event_groups.h"
@@ -15,7 +16,10 @@
 
 extern device_config_t dConfig;
 
-const char stdData[] = "[{\"id\":12,\"name\":\"mahnoo\",\"user_name\":\"bc123456789\"},{\"id\":13,\"name\":\"hfkgdfgka\",\"user_name\":\"adlhglhlaghl\"},{\"id\":14,\"name\":\"dhfaghjhakv,\",\"user_name\":\"adlhglhhflhjvk\"},{\"id\":16,\"name\":\"Prof. Sterling Brakus\",\"user_name\":\"gino.hoeger\"},{\"id\":17,\"name\":\"Miss Naomi Kunze\",\"user_name\":\"treutel.sammy\"},{\"id\":22,\"name\":\"Victor Senger II\",\"user_name\":\"moshe.thompson\"}]";
+char ipstr[INET6_ADDRSTRLEN];
+
+
+//const char stdData[] = "[{\"id\":12,\"name\":\"mahnoo\",\"user_name\":\"bc123456789\"},{\"id\":13,\"name\":\"hfkgdfgka\",\"user_name\":\"adlhglhlaghl\"},{\"id\":14,\"name\":\"dhfaghjhakv,\",\"user_name\":\"adlhglhhflhjvk\"},{\"id\":16,\"name\":\"Prof. Sterling Brakus\",\"user_name\":\"gino.hoeger\"},{\"id\":17,\"name\":\"Miss Naomi Kunze\",\"user_name\":\"treutel.sammy\"},{\"id\":22,\"name\":\"Victor Senger II\",\"user_name\":\"moshe.thompson\"}]";
 
 
 static char* HTTP_SERVER_TAG = "server tag";
@@ -30,7 +34,7 @@ esp_err_t login_page(httpd_req_t *req)
     response = httpd_resp_send(req, loginPage, HTTPD_RESP_USE_STRLEN);
     return response;
 }
-static esp_err_t echo_post_handler(httpd_req_t *req)
+static esp_err_t user_credentials_handler(httpd_req_t *req)
 {
     char buf[100];
     char* username = NULL;
@@ -39,6 +43,18 @@ static esp_err_t echo_post_handler(httpd_req_t *req)
     user_credentials* usr = usr_data_init();
     int ret, remaining = req->content_len;
 
+    int socket = httpd_req_to_sockfd(req); // This is the socket for the request
+
+	struct sockaddr_in6 saddr; // expecting an IPv4 address
+	memset(&saddr, 0, sizeof(saddr)); // Clear it to be sure
+	socklen_t saddr_len = sizeof(saddr);
+
+	if(getpeername(socket, (struct sockaddr *)&saddr, &saddr_len) == 0)
+	{
+        inet_ntop(AF_INET, &saddr.sin6_addr.un.u32_addr[3], ipstr, sizeof(ipstr));
+        ESP_LOGI(HTTP_SERVER_TAG, "Client IP => %s", ipstr);    
+    }
+    
     while (remaining > 0) {
         /* Read the data for the request */
         if ((ret = httpd_req_recv(req, buf,
@@ -83,10 +99,20 @@ esp_err_t dashboard_handler(httpd_req_t *req)
 {
     int response;
     const char* un_authMsg = "Please login first";
-    ESP_LOGI("logs" , "login flag: %d" , login_flag);
+    char client_ip[INET6_ADDRSTRLEN];
+    int socket = httpd_req_to_sockfd(req); // This is the socket for the request
 
+	struct sockaddr_in6 saddr; // expecting an IPv4 address
+	memset(&saddr, 0, sizeof(saddr)); // Clear it to be sure
+	socklen_t saddr_len = sizeof(saddr);
+
+	if(getpeername(socket, (struct sockaddr *)&saddr, &saddr_len) == 0)
+	{
+        inet_ntop(AF_INET, &saddr.sin6_addr.un.u32_addr[3], client_ip, sizeof(client_ip));
+        ESP_LOGI(HTTP_SERVER_TAG, "Client IP => %s", client_ip);    
+    }
     
-    if (login_flag){
+    if (strcmp(ipstr , client_ip) == 0){
     response = httpd_resp_send(req, dashboard, HTTPD_RESP_USE_STRLEN);
     return response;
     }
@@ -102,10 +128,11 @@ esp_err_t dashboard_handler(httpd_req_t *req)
 }
 
 esp_err_t logout_handler(httpd_req_t *req){
-    login_flag = false;
-    ESP_LOGI("logs" , "login flag: %d" , login_flag);
+    /*every time the user logout the ipstr will be all 0's*/
+    memset(&ipstr, 0, sizeof(ipstr)); 
+    ESP_LOGI("remip" , "%s" , ipstr);
+    
     int response;
-   
     response = httpd_resp_send(req, NULL , 0);
     return response;
 }
@@ -113,8 +140,22 @@ esp_err_t logout_handler(httpd_req_t *req){
 esp_err_t get_network(httpd_req_t *req){
     int response;
     const char* un_authMsg = "Please login first";
-    ESP_LOGI("logs" , "login flag: %d" , login_flag);
-    if (login_flag){
+
+    char client_ip[INET6_ADDRSTRLEN];
+    int socket = httpd_req_to_sockfd(req); // This is the socket for the request
+
+	struct sockaddr_in6 saddr; // expecting an IPv4 address
+	memset(&saddr, 0, sizeof(saddr)); // Clear it to be sure
+	socklen_t saddr_len = sizeof(saddr);
+
+	if(getpeername(socket, (struct sockaddr *)&saddr, &saddr_len) == 0)
+	{
+        inet_ntop(AF_INET, &saddr.sin6_addr.un.u32_addr[3], client_ip, sizeof(client_ip));
+        ESP_LOGI(HTTP_SERVER_TAG, "Client IP => %s", client_ip);    
+    }
+    ESP_LOGI(HTTP_SERVER_TAG , "ipstr ->%s" , ipstr);
+
+    if (strcmp(ipstr , client_ip) == 0){
     cJSON *root;
 	root = cJSON_CreateObject();
 	cJSON_AddStringToObject(root, "ip", getIpAddr(&dConfig));
@@ -190,8 +231,32 @@ esp_err_t get_device_configs(httpd_req_t* req)
 
 esp_err_t enrollment_page(httpd_req_t* req){
     int response;
-    response = httpd_resp_send(req , enrollmentPage , HTTPD_RESP_USE_STRLEN);
-    return response;
+    const char* un_authMsg = "Please login first";
+
+    char client_ip[INET6_ADDRSTRLEN];
+    int socket = httpd_req_to_sockfd(req); // This is the socket for the request
+
+	struct sockaddr_in6 saddr; // expecting an IPv4 address
+	memset(&saddr, 0, sizeof(saddr)); // Clear it to be sure
+	socklen_t saddr_len = sizeof(saddr);
+
+	if(getpeername(socket, (struct sockaddr *)&saddr, &saddr_len) == 0)
+	{
+        inet_ntop(AF_INET, &saddr.sin6_addr.un.u32_addr[3], client_ip, sizeof(client_ip));
+        ESP_LOGI(HTTP_SERVER_TAG, "Client IP => %s", client_ip);    
+    }
+
+    if (strcmp(ipstr , client_ip) == 0){
+        response = httpd_resp_send(req , enrollmentPage , HTTPD_RESP_USE_STRLEN);
+        return response;
+
+    } 
+    else {
+        response = httpd_resp_send(req, un_authMsg, HTTPD_RESP_USE_STRLEN);
+        return response;
+    }
+    return ESP_OK;
+
 
 
 
@@ -200,9 +265,8 @@ esp_err_t get_std_data(httpd_req_t* req){
     int response;
     getStudentsData(dConfig);
     // ESP_LOGI("inside server get_std_data" , "%s" , client_receive_buffer);  // bug is here!
-
     response = httpd_resp_send(req , client_receive_buffer , HTTPD_RESP_USE_STRLEN);
-    return response;
+    return response;  
 }
 
 esp_err_t get_date_time(httpd_req_t* req){
@@ -251,6 +315,7 @@ void swh_server_init()
 {
    
     httpd_config_t server_config = HTTPD_DEFAULT_CONFIG();
+    server_config.max_uri_handlers = 10;   // setting max uri handlers to 10
     httpd_handle_t server_handle = NULL;
     ESP_LOGI(HTTP_SERVER_TAG, "Starting server on port: '%d'", server_config.server_port);
 
@@ -264,14 +329,14 @@ void swh_server_init()
 
         httpd_register_uri_handler(server_handle, &uri_login);
 
-        httpd_uri_t uri_get_data = {
+        httpd_uri_t uri_get_user_credentials = {
         .uri = "/getData",
         .method = HTTP_POST,
-        .handler = echo_post_handler,
+        .handler = user_credentials_handler,
         .user_ctx = NULL
         };
 
-        httpd_register_uri_handler(server_handle, &uri_get_data);
+        httpd_register_uri_handler(server_handle, &uri_get_user_credentials);
 
 
         httpd_uri_t uri_dashboard = {

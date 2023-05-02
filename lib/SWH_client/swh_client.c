@@ -127,11 +127,15 @@ esp_err_t getStudentsData(device_config_t dConfig)
     if (err == ESP_OK)
     {
         int status_code = esp_http_client_get_status_code(client);
-        ESP_LOGI(HTTP_CLIENT_TAG, "HTTP GET Status = %d, content_length = %" PRIu64,
+        int response_len = (int)esp_http_client_get_content_length(client);
+
+        ESP_LOGI(HTTP_CLIENT_TAG, "HTTP GET Status = %d, content_length = %d",
                  status_code,
-                 esp_http_client_get_content_length(client));
+                 response_len);
         if (status_code == 200)
         {
+            client_receive_buffer[response_len] = '\0';
+            ESP_LOGI(HTTP_CLIENT_TAG , "client_recieve -> %s" , client_receive_buffer);
             //xEventGroupSetBits(spiffs_event_group, CLIENT_RECIEVED_BIT);
         }
     }
