@@ -19,7 +19,7 @@ extern device_config_t dConfig;
 char ipstr[INET6_ADDRSTRLEN];
 
 
-//const char stdData[] = "[{\"id\":12,\"name\":\"mahnoo\",\"user_name\":\"bc123456789\"},{\"id\":13,\"name\":\"hfkgdfgka\",\"user_name\":\"adlhglhlaghl\"},{\"id\":14,\"name\":\"dhfaghjhakv,\",\"user_name\":\"adlhglhhflhjvk\"},{\"id\":16,\"name\":\"Prof. Sterling Brakus\",\"user_name\":\"gino.hoeger\"},{\"id\":17,\"name\":\"Miss Naomi Kunze\",\"user_name\":\"treutel.sammy\"},{\"id\":22,\"name\":\"Victor Senger II\",\"user_name\":\"moshe.thompson\"}]";
+const char stdData[] = "[{\"id\":12,\"name\":\"mahnoo\",\"user_name\":\"bc123456789\"},{\"id\":13,\"name\":\"hfkgdfgka\",\"user_name\":\"adlhglhlaghl\"},{\"id\":14,\"name\":\"dhfaghjhakv,\",\"user_name\":\"adlhglhhflhjvk\"},{\"id\":16,\"name\":\"Prof. Sterling Brakus\",\"user_name\":\"gino.hoeger\"},{\"id\":17,\"name\":\"Miss Naomi Kunze\",\"user_name\":\"treutel.sammy\"},{\"id\":22,\"name\":\"Victor Senger II\",\"user_name\":\"moshe.thompson\"}]";
 
 
 static char* HTTP_SERVER_TAG = "server tag";
@@ -182,6 +182,7 @@ esp_err_t get_device_configs(httpd_req_t* req)
     char* auth_token = NULL;
     char* device_location = NULL;
     char* location_id = NULL;
+    int response = 0;
 
     int ret, remaining = req->content_len;
 
@@ -219,9 +220,13 @@ esp_err_t get_device_configs(httpd_req_t* req)
         setDeviceLocation(&dConfig , device_location);
         setLocationId(&dConfig , atoi(location_id));
         xEventGroupSetBits(spiffs_event_group , DEVICE_CONFIG_BIT); // test it outside the while loop
+        response = httpd_resp_send(req , NULL , 0);
+
+        cJSON_Delete(root2);
+
+        return response;
     }
 
-    cJSON_Delete(root2);
     return ESP_OK;
 
 
@@ -264,9 +269,12 @@ esp_err_t enrollment_page(httpd_req_t* req){
 esp_err_t get_std_data(httpd_req_t* req){
     int response;
     getStudentsData(dConfig);
+    
     // ESP_LOGI("inside server get_std_data" , "%s" , client_receive_buffer);  // bug is here!
     response = httpd_resp_send(req , client_receive_buffer , HTTPD_RESP_USE_STRLEN);
-    return response;  
+    return response;
+    //return ESP_OK;
+    
 }
 
 esp_err_t get_date_time(httpd_req_t* req){

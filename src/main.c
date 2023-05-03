@@ -76,7 +76,7 @@ static void networkStatusTask(void *pvParameter)
             noti.val = GOT_IP_FLAG;
             noti.msg = "got ip address";
             swh_server_init();
-            //getStudentsData(dConfig);
+            // getStudentsData(dConfig);
 
             
             mailBox_status = xQueueSend(mailBox, &noti, portMAX_DELAY);
