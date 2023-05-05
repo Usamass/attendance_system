@@ -22,6 +22,11 @@ char* serialize_it(device_config_t* dConfig)
     return device_config_buffer;
 }
 
+// char* deserialize_it()
+// {
+
+// }
+
 const char* str_replace(char* str, const char* old, const char* new) {
     // allocate memory for the result string
     int old_len = strlen(old);

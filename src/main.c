@@ -35,6 +35,7 @@
 QueueHandle_t mailBox;
 QueueHandle_t spiffs_mailBox;
 extern device_config_t dConfig; // device ip and mac will be set on connect to network
+extern mapping_strct mp_struct; // mapping variable first defined in swh_server.c
 EventGroupHandle_t spiffs_event_group;
 
 i2c_dev_t dev;
@@ -170,7 +171,7 @@ static void db_interface_task()
             DataSource_t dataSrc = CLIENT;
             spiffs_noti.data_scr = dataSrc;
             spiffs_noti.flag_type = CLIENT_WRITE_FLAG;
-            spiffs_noti.data = client_receive_buffer;
+            spiffs_noti.data =/*client_receive_buffer*/;
 
             mailBox_status = xQueueSend(spiffs_mailBox, &spiffs_noti, portMAX_DELAY);
             if (mailBox_status != pdPASS)

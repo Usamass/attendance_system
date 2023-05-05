@@ -13,13 +13,15 @@
 #include "../SWH_data_buffers.h"
 #include "../SWH_eventGroups.h"
 #include "../event_bits.h"
+#include "../SWH_custom_data_structs.h"
 
 extern device_config_t dConfig;
+mapping_strct mp_strct;
 
 char ipstr[INET6_ADDRSTRLEN];
 
 
-const char stdData[] = "[{\"id\":12,\"name\":\"mahnoo\",\"user_name\":\"bc123456789\"},{\"id\":13,\"name\":\"hfkgdfgka\",\"user_name\":\"adlhglhlaghl\"},{\"id\":14,\"name\":\"dhfaghjhakv,\",\"user_name\":\"adlhglhhflhjvk\"},{\"id\":16,\"name\":\"Prof. Sterling Brakus\",\"user_name\":\"gino.hoeger\"},{\"id\":17,\"name\":\"Miss Naomi Kunze\",\"user_name\":\"treutel.sammy\"},{\"id\":22,\"name\":\"Victor Senger II\",\"user_name\":\"moshe.thompson\"}]";
+// const char stdData[] = "[{\"id\":12,\"name\":\"mahnoo\",\"user_name\":\"bc123456789\"},{\"id\":13,\"name\":\"hfkgdfgka\",\"user_name\":\"adlhglhlaghl\"},{\"id\":14,\"name\":\"dhfaghjhakv,\",\"user_name\":\"adlhglhhflhjvk\"},{\"id\":16,\"name\":\"Prof. Sterling Brakus\",\"user_name\":\"gino.hoeger\"},{\"id\":17,\"name\":\"Miss Naomi Kunze\",\"user_name\":\"treutel.sammy\"},{\"id\":22,\"name\":\"Victor Senger II\",\"user_name\":\"moshe.thompson\"}]";
 
 
 static char* HTTP_SERVER_TAG = "server tag";
@@ -270,10 +272,8 @@ esp_err_t get_std_data(httpd_req_t* req){
     int response;
     getStudentsData(dConfig);
     
-    // ESP_LOGI("inside server get_std_data" , "%s" , client_receive_buffer);  // bug is here!
     response = httpd_resp_send(req , client_receive_buffer , HTTPD_RESP_USE_STRLEN);
     return response;
-    //return ESP_OK;
     
 }
 
@@ -316,7 +316,13 @@ esp_err_t get_date_time(httpd_req_t* req){
 
 
 }
+/*
+static esp_err_t get_vu_id()
+{
 
+    mp_strct.vu_id_st = Vu_id
+}
+*/
 
 
 void swh_server_init()
