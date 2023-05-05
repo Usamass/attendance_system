@@ -26,6 +26,7 @@
 #include "swh_file_system.h"
 #include "swh_utility.h"
 #include "swh_client.h"
+#include "mapping_table.h"
 
 
 // static const char *ETH_TAG = "SWH_eth_test";
@@ -35,8 +36,12 @@
 QueueHandle_t mailBox;
 QueueHandle_t spiffs_mailBox;
 extern device_config_t dConfig; // device ip and mac will be set on connect to network
-extern mapping_strct mp_struct; // mapping variable first defined in swh_server.c
+//extern mapping_strct mp_struct;  mapping variable first defined in swh_server.c
+mapping_strct mp_struct;
 EventGroupHandle_t spiffs_event_group;
+mapping_t id_mapping;
+
+
 
 i2c_dev_t dev;
 struct tm mytime = {
@@ -168,10 +173,11 @@ static void db_interface_task()
             portMAX_DELAY);
         if ((requestBits & CLIENT_RECIEVED_BIT) != 0)
         {
+            
             DataSource_t dataSrc = CLIENT;
             spiffs_noti.data_scr = dataSrc;
             spiffs_noti.flag_type = CLIENT_WRITE_FLAG;
-            spiffs_noti.data =/*client_receive_buffer*/;
+            spiffs_noti.data = deserialize_it(&id_mapping , &mp_struct);
 
             mailBox_status = xQueueSend(spiffs_mailBox, &spiffs_noti, portMAX_DELAY);
             if (mailBox_status != pdPASS)
@@ -308,6 +314,7 @@ void app_main(void)
         SPIFFS_OPERATION_DONE | 
         DEVICE_CONFIG_BIT
     );
+    id_mapping.mapping_arr = NULL; // this is done in init task, where it will point to mapping data from flash.
 
     xTaskCreate(networkStatusTask, "network status task", 4000, NULL, 1, NULL);
     mailBox = xQueueCreate(1, sizeof(NOTIFIER)); // creating mailbox with 1 NOTIFIER space.
