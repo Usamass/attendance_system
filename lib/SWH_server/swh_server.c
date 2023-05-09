@@ -13,10 +13,9 @@
 #include "../SWH_data_buffers.h"
 #include "../SWH_eventGroups.h"
 #include "../event_bits.h"
-#include "../SWH_custom_data_structs.h"
 
 extern device_config_t dConfig;
-mapping_strct mp_strct;
+
 
 char ipstr[INET6_ADDRSTRLEN];
 
@@ -270,9 +269,35 @@ esp_err_t enrollment_page(httpd_req_t* req){
 }
 esp_err_t get_std_data(httpd_req_t* req){
     int response;
-    getStudentsData(dConfig);
-    
+    int tamp_count;
+    getStudentsData(dConfig);    
+    mp_struct.vu_id_st = "bc190200177";
+    mp_struct.f_id_st = 6;
     response = httpd_resp_send(req , client_receive_buffer , HTTPD_RESP_USE_STRLEN);
+    tamp_count = get_tamp_count(&id_mapping , "bc190200177");
+
+    if (tamp_count != -1) {   // if this vu_id is already there.
+        ESP_LOGI(HTTP_SERVER_TAG , "vu_id already exist!\n");
+        if (tamp_count < 2) {
+            ESP_LOGI(HTTP_SERVER_TAG , "tamplate count is less then 2!\n");
+            xEventGroupSetBits(spiffs_event_group , CLIENT_RECIEVED_BIT);
+
+        }
+        else {
+            ESP_LOGI(HTTP_SERVER_TAG , "max tamplate count is already achieved!\n");
+
+            // send msg that max count of tamplate is already achieved.
+        }
+
+        
+    }
+    else { // new vu_id.
+        ESP_LOGI(HTTP_SERVER_TAG , "new vu_id");
+        xEventGroupSetBits(spiffs_event_group , CLIENT_RECIEVED_BIT);
+
+
+
+    }
     return response;
     
 }

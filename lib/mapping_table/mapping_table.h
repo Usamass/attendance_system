@@ -13,9 +13,11 @@ typedef struct {
 }mapping_t;
 
 char* deserialize_it(mapping_t* , mapping_strct*);
+void get_vu_id(mapping_t* id_mapping , int f_id);
 int get_mapping_size(mapping_t* id_mapping);
 int get_tamp_count(mapping_t* id_mapping , const char* id);
 int get_finger_id(mapping_t* id_mapping , const char* id);
+void parse_mapping(mapping_t* id_mapping);
 
 
 
