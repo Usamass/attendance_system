@@ -166,7 +166,7 @@ static void db_interface_task()
     {
         EventBits_t requestBits = xEventGroupWaitBits(
             spiffs_event_group,
-            CLIENT_RECIEVED_BIT | DEVICE_CONFIG_BIT | LOAD_MAPPING_BIT, // add other event bit as the application grows.
+            CLIENT_RECIEVED_BIT | DEVICE_CONFIG_BIT | LOAD_MAPPING_BIT | FLASH_FLUSHING_BIT, // add other event bit as the application grows.
             pdTRUE,
             pdFALSE,
             portMAX_DELAY);
@@ -199,6 +199,17 @@ static void db_interface_task()
             DataSource_t dataSrc = LOAD_MAPPING;
             spiffs_noti.data_scr = dataSrc;
             spiffs_noti.flag_type = LOAD_MAPPING_FLAG;
+            spiffs_noti.data = NULL;
+
+            mailBox_status = xQueueSend(spiffs_mailBox, &spiffs_noti, portMAX_DELAY);
+            if (mailBox_status != pdPASS){
+                ESP_LOGI(MAILBOX_TAG, "Could not send to the queue \n");
+            }
+
+        }
+        else if ((requestBits & FLASH_FLUSHING_BIT) != 0){
+            DataSource_t dataSrc = FLASH_FLUSH;
+            spiffs_noti.data_scr = dataSrc;
             spiffs_noti.data = NULL;
 
             mailBox_status = xQueueSend(spiffs_mailBox, &spiffs_noti, portMAX_DELAY);
@@ -276,34 +287,46 @@ static void spiffs_task()
                     fseek(f, 0L, SEEK_END); // move file pointer to end of file
                     long size = ftell(f);   // get file size
                     fseek(f, 0L, SEEK_SET); // move file pointer back to beginning of file
-
+                    
                     id_mapping.mapping_arr = (char *)malloc(size); // allocate memory for buffer
                     if (id_mapping.mapping_arr == NULL)
                     {
-                        ESP_LOGI(TAG_exe, "Error allocating memory.\n");
+                        ESP_LOGI(TAG_exe, "No data inside /spiffs/stdData.txt\n");
                         fclose(f);
-                        return;
+                        //return;
                     }
+                    else {
 
-                    size_t result = fread(id_mapping.mapping_arr, 1, size, f); // read file into buffer
-                    if (result != size)
-                    {
-                        ESP_LOGI(TAG_exe, "Error reading file.\n");
+                        size_t result = fread(id_mapping.mapping_arr, 1, size, f); // read file into buffer
+                        if (result != size)
+                        {
+                            ESP_LOGI(TAG_exe, "Error reading file.\n");
+                            free(id_mapping.mapping_arr);
+                            fclose(f);
+                            return;
+                        }
+
+                        fclose(f); // close the file
+
+                        ESP_LOGI(TAG_exe, "Read from file: '%s'", id_mapping.mapping_arr);
+                        // parse this to get root* (id_mapping.root = cJSON_parse(id_mapping.mapping_arr))
+                        parse_mapping(&id_mapping);
+                        //get_vu_id(&id_mapping , 6);
+
                         free(id_mapping.mapping_arr);
-                        fclose(f);
-                        return;
                     }
-
-                    fclose(f); // close the file
-
-                    ESP_LOGI(TAG_exe, "Read from file: '%s'", id_mapping.mapping_arr);
-                    // parse this to get root* (id_mapping.root = cJSON_parse(id_mapping.mapping_arr))
-                    parse_mapping(&id_mapping);
-                    get_vu_id(&id_mapping , 6);
-
-                    free(id_mapping.mapping_arr);
                 }
-                
+
+            }
+            else if (spiffs_noti.data_scr == FLASH_FLUSH){
+                ESP_LOGI("SPIFFS testing" , "inside flushing flash!\n");
+                FILE* file = fopen("/spiffs/stdData.txt", "w");
+                if (file == NULL) {
+                    ESP_LOGI("SPIFFS testing" , "writing on file error!\n");
+                    // Error handling: Failed to open the file
+                    // Handle the error appropriately
+                }
+                fclose(file);
 
             }
         }
@@ -331,7 +354,8 @@ void app_main(void)
         CLIENT_RECIEVED_BIT | 
         SPIFFS_OPERATION_DONE | 
         DEVICE_CONFIG_BIT |
-        LOAD_MAPPING_BIT
+        LOAD_MAPPING_BIT | 
+        FLASH_FLUSHING_BIT
     );
     id_mapping.mapping_arr = NULL; // this is done in init task, where it will point to mapping data from flas
 
@@ -365,6 +389,7 @@ void app_main(void)
 
     /*Load mapping data from the flash*/
     xEventGroupSetBits(spiffs_event_group , LOAD_MAPPING_BIT); 
+    //xEventGroupSetBits(spiffs_event_group , FLASH_FLUSHING_BIT);
     //printf("finger to vu_id : %s" , get_vu_id(&id_mapping , 5));
 }
 

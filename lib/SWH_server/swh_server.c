@@ -14,6 +14,8 @@
 #include "../SWH_eventGroups.h"
 #include "../event_bits.h"
 
+#define MAX_TAMPLATES 2
+
 extern device_config_t dConfig;
 
 
@@ -220,7 +222,8 @@ esp_err_t get_device_configs(httpd_req_t* req)
         setAuthToken(&dConfig , auth_token);
         setDeviceLocation(&dConfig , device_location);
         setLocationId(&dConfig , atoi(location_id));
-        xEventGroupSetBits(spiffs_event_group , DEVICE_CONFIG_BIT); // test it outside the while loop
+
+        xEventGroupSetBits(spiffs_event_group , DEVICE_CONFIG_BIT); 
         response = httpd_resp_send(req , NULL , 0);
 
         cJSON_Delete(root2);
@@ -268,36 +271,10 @@ esp_err_t enrollment_page(httpd_req_t* req){
 
 }
 esp_err_t get_std_data(httpd_req_t* req){
+    ESP_LOGI(HTTP_SERVER_TAG , "inside get std data handler!\n");
     int response;
-    int tamp_count;
-    getStudentsData(dConfig);    
-    mp_struct.vu_id_st = "bc190200177";
-    mp_struct.f_id_st = 6;
+    getStudentsData(dConfig);   
     response = httpd_resp_send(req , client_receive_buffer , HTTPD_RESP_USE_STRLEN);
-    tamp_count = get_tamp_count(&id_mapping , "bc190200177");
-
-    if (tamp_count != -1) {   // if this vu_id is already there.
-        ESP_LOGI(HTTP_SERVER_TAG , "vu_id already exist!\n");
-        if (tamp_count < 2) {
-            ESP_LOGI(HTTP_SERVER_TAG , "tamplate count is less then 2!\n");
-            xEventGroupSetBits(spiffs_event_group , CLIENT_RECIEVED_BIT);
-
-        }
-        else {
-            ESP_LOGI(HTTP_SERVER_TAG , "max tamplate count is already achieved!\n");
-
-            // send msg that max count of tamplate is already achieved.
-        }
-
-        
-    }
-    else { // new vu_id.
-        ESP_LOGI(HTTP_SERVER_TAG , "new vu_id");
-        xEventGroupSetBits(spiffs_event_group , CLIENT_RECIEVED_BIT);
-
-
-
-    }
     return response;
     
 }
@@ -332,22 +309,84 @@ esp_err_t get_date_time(httpd_req_t* req){
             ESP_LOGI(JSON_TAG, "time=%s",time);
         }
 
+        response = httpd_resp_send(req , NULL , 0);
+        cJSON_Delete(root2);
+
+        return response;
+
     }
+
+    return ESP_OK;
      
 
 
-    response = httpd_resp_send(req , NULL , 0);
-    return response;
+    
 
 
 }
-/*
-static esp_err_t get_vu_id()
+
+static esp_err_t enroll_student(httpd_req_t* req)
 {
+    char buf[50];
+    cJSON* root2 = NULL;
 
-    mp_strct.vu_id_st = Vu_id
+    int response = 0;
+    int tamp_count;
+
+    mp_struct.vu_id_st = (char*)malloc(sizeof(char) * 15);
+    int ret, remaining = req->content_len;
+
+    while (remaining > 0) {
+        /* Read the data for the request */
+        if ((ret = httpd_req_recv(req, buf,
+                        MIN(remaining, sizeof(buf)))) <= 0) {
+            if (ret == HTTPD_SOCK_ERR_TIMEOUT) {
+                /* Retry receiving if timeout occurred */
+                continue;
+            }
+            return ESP_FAIL;
+        }
+        ESP_LOGI(JSON_TAG, "Deserialize the reponse");
+        root2 = cJSON_Parse(buf);
+        if (cJSON_GetObjectItem(root2, "vu_id")) {
+            mp_struct.vu_id_st = cJSON_GetObjectItem(root2,"vu_id")->valuestring;
+            ESP_LOGI(JSON_TAG, "vu_id=%s",mp_struct.vu_id_st);
+        
+            mp_struct.f_id_st = 9;
+            tamp_count = get_tamp_count(&id_mapping , mp_struct.vu_id_st);
+
+            if (tamp_count != -1) {   // if this vu_id is already there.
+                ESP_LOGI(HTTP_SERVER_TAG , "vu_id already exist!\n");
+                if (tamp_count < MAX_TAMPLATES) {
+                    ESP_LOGI(HTTP_SERVER_TAG , "tamplate count is less then 2!\n");
+                    xEventGroupSetBits(spiffs_event_group , CLIENT_RECIEVED_BIT);
+
+                }
+                else {
+                    ESP_LOGI(HTTP_SERVER_TAG , "max tamplate count is already achieved!\n");
+
+                    // send msg that max count of tamplate is already achieved.
+                }
+
+                
+            }
+            else { // new vu_id.
+                ESP_LOGI(HTTP_SERVER_TAG , "new vu_id");
+                xEventGroupSetBits(spiffs_event_group , CLIENT_RECIEVED_BIT);
+
+
+
+            }
+        }
+        response = httpd_resp_send(req , NULL , 0);
+        cJSON_Delete(root2);
+        return response;
+        
+    }
+    
+    return ESP_OK;
 }
-*/
+
 
 
 void swh_server_init()
@@ -444,8 +483,14 @@ void swh_server_init()
 
        httpd_register_uri_handler(server_handle , &uri_get_enrollment);
 
-        
+        httpd_uri_t uri_enroll_student = {
+            .uri = "/enrollStudent",
+            .method = HTTP_POST,
+            .handler = enroll_student,
+            .user_ctx = NULL
+        };
 
+       httpd_register_uri_handler(server_handle , &uri_enroll_student);
 
     }
     else{
