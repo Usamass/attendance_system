@@ -1,5 +1,6 @@
 #include <stdlib.h>
 #include <sys/socket.h>
+#include <time.h>
 #include "esp_log.h"
 #include "esp_http_server.h"
 #include "freertos/event_groups.h"
@@ -13,6 +14,8 @@
 #include "../SWH_data_buffers.h"
 #include "../SWH_eventGroups.h"
 #include "../event_bits.h"
+#include "swh_utility.h"
+#include <ds1307.h>
 
 #define MAX_TAMPLATES 2
 
@@ -282,6 +285,8 @@ esp_err_t get_std_data(httpd_req_t* req){
 esp_err_t get_date_time(httpd_req_t* req){
     char buf[50];
     int response;
+    struct tm current_time;
+
 
     char* date = NULL;
     char* time = NULL;
@@ -308,6 +313,17 @@ esp_err_t get_date_time(httpd_req_t* req){
             time = cJSON_GetObjectItem(root2,"time")->valuestring;
             ESP_LOGI(JSON_TAG, "time=%s",time);
         }
+
+        current_time = date_time_parser(date , time);
+        
+        mytime.tm_year = current_time.tm_year;
+        mytime.tm_mon  = current_time.tm_mon;  
+        mytime.tm_mday = current_time.tm_mday;
+        mytime.tm_hour = current_time.tm_hour;
+        mytime.tm_min  = current_time.tm_min;
+        mytime.tm_sec  = current_time.tm_sec;
+
+        ESP_ERROR_CHECK(ds1307_set_time(&dev, &mytime));
 
         response = httpd_resp_send(req , NULL , 0);
         cJSON_Delete(root2);
@@ -465,14 +481,14 @@ void swh_server_init()
 
         httpd_register_uri_handler(server_handle , &uri_get_configs);
 
-    //    httpd_uri_t uri_get_date_time = {
-    //         .uri = "/dateTime",
-    //         .method = HTTP_POST,
-    //         .handler = get_date_time,
-    //         .user_ctx = NULL
-    //     };
+       httpd_uri_t uri_get_date_time = {
+            .uri = "/dateTime",
+            .method = HTTP_POST,
+            .handler = get_date_time,
+            .user_ctx = NULL
+        };
 
-    //    httpd_register_uri_handler(server_handle , &uri_get_date_time);
+       httpd_register_uri_handler(server_handle , &uri_get_date_time);
 
        httpd_uri_t uri_get_enrollment = {
             .uri = "/enrollment",

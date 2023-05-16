@@ -23,9 +23,9 @@ esp_err_t _http_event_handler(esp_http_client_event_t *evt)
         ESP_LOGI(HTTP_CLIENT_TAG, "HTTP_EVENT_ON_HEADER, key=%s, value=%s", evt->header_key, evt->header_value);
         break;
     case HTTP_EVENT_ON_DATA:
-        content_len = evt->data_len;
-        ESP_LOGI(HTTP_CLIENT_TAG, "HTTP_EVENT_ON_DATA, len=%d", evt->data_len);
-        ESP_LOGI(HTTP_CLIENT_TAG, "HTTP_RESPONSE_DATA: %s \n", (char *)evt->data);
+        // content_len = evt->data_len;
+        // ESP_LOGI(HTTP_CLIENT_TAG, "HTTP_EVENT_ON_DATA, len=%d", evt->data_len);
+        // ESP_LOGI(HTTP_CLIENT_TAG, "HTTP_RESPONSE_DATA: %s \n", (char *)evt->data);
         /*
          *  Check for chunked encoding is added as the URL for chunked encoding used in this example returns binary data.
          *  However, event handler can also be used in case chunked encoding is used.

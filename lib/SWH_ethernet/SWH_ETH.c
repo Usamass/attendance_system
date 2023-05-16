@@ -76,7 +76,7 @@ static void got_ip_event_handler(void *arg, esp_event_base_t event_base,
 
 void swh_eth_init()
 {
-
+    uint8_t dma_channel = 1;
     swh_ethernet_event_group = xEventGroupCreate();
     xEventGroupClearBits(swh_ethernet_event_group , ETHERNET_CONNECTED_BIT | 
     ETHERNET_DISCONNECT_BIT | 
@@ -100,7 +100,7 @@ void swh_eth_init()
         .quadwp_io_num = -1,
         .quadhd_io_num = -1,
     };
-    ESP_ERROR_CHECK(spi_bus_initialize(ENC_SPI_HOST, &buscfg, SPI_DMA_CH_AUTO));
+    ESP_ERROR_CHECK(spi_bus_initialize(ENC_SPI_HOST, &buscfg, (spi_dma_chan_t)dma_channel));
     /* ENC28J60 ethernet driver is based on spi driver */
     spi_device_interface_config_t spi_devcfg = {
         .mode = 0,

@@ -28,6 +28,31 @@
 #include "swh_client.h"
 #include "mapping_table.h"
 
+#include <lvgl.h>
+#include <lvgl_helpers.h>
+#include <vu_logo_1.c>
+#include <check.c>
+#include <remove.c>
+#include <art.c>
+#include <lv_font_montserrat_32.c>
+#include "esp_timer.h"
+#include "driver/gpio.h"
+#include "driver/uart.h"
+#include "r307.h"
+#include "sys_beeps.h"
+#include "esp_freertos_hooks.h"
+#include "freertos/semphr.h"
+
+
+/*********************
+ *      DEFINES
+ *********************/
+#define TAG "LVGL_TAG"
+#define LV_TICK_PERIOD_MS 1
+#define FINGERPRINT_INPUT_PIN 34
+#define FINGERPRINT_NOTI_DELAY 50
+#define GOT_F_ID 5
+
 
 // static const char *ETH_TAG = "SWH_eth_test";
 // static const char *HTTP_SERVER_TAG = "SWH_HTTP_TEST";
@@ -36,30 +61,183 @@
 QueueHandle_t mailBox;
 QueueHandle_t spiffs_mailBox;
 extern device_config_t dConfig; // device ip and mac will be set on connect to network.
+extern uint16_t template_number;   // getting templete number from fingerprint library
+bool shared_bit_f = false;
 EventGroupHandle_t spiffs_event_group;
+EventGroupHandle_t fingerprint_event;
 mapping_t id_mapping;
 mapping_strct mp_struct;
-
+uint8_t finger_msg = 0x00;
+static uint8_t opt_flag = 0;/* <- do'nt forget this*/
 
 
 i2c_dev_t dev;
 struct tm mytime = {
-        .tm_year = 123, //(2022 - 1900)
-        .tm_mon  = 04,  
-        .tm_mday = 10,
-        .tm_hour = 8,
-        .tm_min  = 33,
-        .tm_sec  = 30
+    .tm_year = 123, //(2022 - 1900)
+    .tm_mon  = 04,  
+    .tm_mday = 10,
+    .tm_hour = 8,
+    .tm_min  = 33,
+    .tm_sec  = 30
     };
   
 // #define EXAMPLE_ESP_MAXIMUM_RETRY (5)
 // #define EXAMPLE_HTTP_QUERY_KEY_MAX_LEN (64)
 // #define MIN(a, b) (((a) < (b)) ? (a) : (b))
+/**********************
+ *  STATIC PROTOTYPES
+ **********************/
+static void lv_tick_task(void *arg);
+static void guiTask(void *pvParameter);
+static lv_obj_t* create_msgbox(lv_obj_t* bck_img , const char* title , const char* msg);
+static lv_obj_t* create_img(lv_obj_t* bck_img , const lv_img_dsc_t* icon_scr);
 
 static const char *HTTP_CLIENT_TAG = "http client";
 static const char *MAILBOX_TAG = "mailbox";
 static const char *TAG_exe = "spiffs";
+static const char* F_TAG = "finger tag";
 // static const char *JSON_TAG = "JSON";
+
+char default_address[4] = {0xFF, 0xFF, 0xFF, 0xFF};         //++ Default Module Address is FF:FF:FF:FF
+char default_password[4] = {0x00, 0x00, 0x00, 0x00};        //++ Default Module Password is 00:00:00:00
+
+// fingerprint touch sensor event handlar (external event)
+static void IRAM_ATTR fingerprint_handler(void* args){
+    
+    xEventGroupSetBits(fingerprint_event , FINGERPRINT_IMG_EVENT_BIT);
+    shared_bit_f ^= shared_bit_f;
+    
+
+}
+/*This task will collect the fingerprints from the sensor*/
+static void takeImg(void* args){
+    EventBits_t f_bit;
+    uint8_t confirmation_code;
+    uint8_t max_image = 0;
+
+
+    while (true){
+       f_bit = xEventGroupWaitBits(fingerprint_event , FINGERPRINT_IMG_EVENT_BIT , pdTRUE , pdFALSE , portMAX_DELAY);
+
+       if ((f_bit & FINGERPRINT_IMG_EVENT_BIT) != 0){
+            confirmation_code = -1;
+            while (confirmation_code != 0x00 && max_image < 5){
+                confirmation_code = GenImg(default_address);
+                max_image++;
+            }
+            max_image = 0;
+
+            if (confirmation_code == 0x00){
+                xEventGroupSetBits(fingerprint_event , FINGERPRINT_DONE_EVENT_BIT);
+            }
+            
+           
+
+        }
+    }
+
+}
+/* imp!!  This task will enroll or make attendance to collected fingerprints */
+/* opt_flag = 0 -> attendance
+   opt_flag = 1 -> enrollment
+*/
+static void fingerprintTask(void* args){
+    EventBits_t f_bit;
+    uint8_t confirmation_code = 0;
+    uint8_t count = 0;
+    char int_str[10] = {0};
+    char temp_str[10] = {0};
+   
+    while (true){
+    
+        f_bit = xEventGroupWaitBits(fingerprint_event , FINGERPRINT_DONE_EVENT_BIT , pdTRUE , pdFALSE , portMAX_DELAY);
+        if ((f_bit & FINGERPRINT_DONE_EVENT_BIT) != 0){
+            if (opt_flag){
+                /* Enrollment logic */ 
+                count++;
+                TempleteNum(default_address);
+                sprintf(temp_str , "%d" , template_number +1);
+                if (count <= 2){
+                    sprintf(int_str , "%d" , count);
+                    finger_msg = FINGERPRINT_RELEASE_MSG;
+                    ESP_LOGI(F_TAG , "Please Release the finger! count: %d\n" , count);
+                    while (gpio_get_level(FINGERPRINT_INPUT_PIN) != 1);
+                    finger_msg = FINGERPRINT_RELEASE_CODE;
+                    ESP_LOGI(F_TAG , "finger released!\n");
+                    confirmation_code = Img2Tz(default_address , int_str);
+                    if (confirmation_code == 0x00){
+                        if (count == 2){
+                            confirmation_code = RegModel(default_address);
+                            if (confirmation_code == 0x00){
+                                confirmation_code = Store(default_address , "1" , temp_str); // page id field is variable
+                                // mp_struct.f_id = template_number;
+                                // xEventGroupSetBit(spiffs_task , GOT_FINGER_ID); 
+                                if (confirmation_code != 0x00){
+                                    count = 0;
+                                    opt_flag = 0;
+                                    finger_msg = FINGERPRINT_ENROLL_ERROR;
+                                }
+                                else {
+                                    finger_msg = FINGERPRINT_STORE_SUCCESS;
+                                }
+                                count = 0;
+                            }
+                            else {
+                                count = 0;
+                                finger_msg = FINGERPRINT_ENROLL_ERROR;
+                            }
+                        }
+                        else {
+                            finger_msg = FINGERPRINT_SENCOND_PRINT;
+                            ESP_LOGI(F_TAG , "Please put same finger on the sensor!\n");
+                        }
+                    }
+                    else {
+                        count = 0;
+                        finger_msg = FINGERPRINT_ENROLL_ERROR;
+                    }
+                
+                
+                }    
+            }
+            else {
+                /*attendance logic*/
+                TempleteNum(default_address);
+                sprintf(int_str , "%d" , template_number);
+                // ESP_LOGI(F_TAG , "Please Release the finger! templete: %s ", int_str);
+                // while (gpio_get_level(FINGERPRINT_INPUT_PIN) != 1);
+                // ESP_LOGI(F_TAG , "finger released!\n");
+                
+                confirmation_code = Img2Tz(default_address , "1");
+                if (confirmation_code == 0x00){
+                    confirmation_code = Search(default_address , "1" , "0" , int_str);
+                    if (confirmation_code == 0x00){
+                        ds1307_get_time(&dev, &mytime);
+                        printf("%04d-%02d-%02d %02d:%02d:%02d\n", mytime.tm_year + 1900 /*Add 1900 for better readability*/, mytime.tm_mon + 1,
+                        mytime.tm_mday, mytime.tm_hour, mytime.tm_min, mytime.tm_sec);
+                        finger_msg = FINGERPRINT_SUCCESS;  // fingerprint match 
+                        //xEventGroupSetBits(mapping_event , GOT_F_ID);
+                       
+
+                    }
+                    else {
+                        threeShortBeeps();
+                        finger_msg = FINGERPRINT_NOT_MACHING;  // no fingerprint matches
+                    }
+                    
+                }
+                else {
+                    threeShortBeeps();
+                    finger_msg = 0x03; // image error try again
+
+                }
+
+
+            }
+        }
+    }
+}
+
 
 //------------------------------This task will notify network status------------------------------------------------------
 
@@ -341,9 +519,10 @@ void app_main(void)
 {
     // init(); // this function will initialize all the configs on device.
     rgbConfig();
+    r307_init();            // initializing uart for r307 fingerprint sensor.
     swh_eth_init();         // initializing ethernet hardware.
     swh_file_system_init(); // initializing file system.
-    ESP_ERROR_CHECK(i2cdev_init());
+    ESP_ERROR_CHECK(i2cdev_init());  // initializing i2c driver for rtc module.
     memset(&dev, 0, sizeof(i2c_dev_t));
     ESP_ERROR_CHECK(ds1307_init_desc(&dev, 0, 21, 22));
     ESP_ERROR_CHECK(ds1307_set_time(&dev, &mytime)); 
@@ -357,8 +536,23 @@ void app_main(void)
         LOAD_MAPPING_BIT | 
         FLASH_FLUSHING_BIT
     );
-    id_mapping.mapping_arr = NULL; // this is done in init task, where it will point to mapping data from flas
 
+    fingerprint_event = xEventGroupCreate();
+    xEventGroupClearBits(fingerprint_event , FINGERPRINT_IMG_EVENT_BIT | FINGERPRINT_DONE_EVENT_BIT | FINGERPRINT_ERROR_EVENT_BIT);
+
+    gpio_reset_pin(FINGERPRINT_INPUT_PIN);                                         
+    gpio_set_direction(FINGERPRINT_INPUT_PIN , GPIO_MODE_INPUT);
+    gpio_set_intr_type(FINGERPRINT_INPUT_PIN , GPIO_INTR_NEGEDGE);
+    gpio_install_isr_service(0);
+    gpio_isr_handler_add(FINGERPRINT_INPUT_PIN , fingerprint_handler , (void*)1);
+
+
+    id_mapping.mapping_arr = NULL; // this is done in init task, where it will point to mapping data from flash
+    
+    xTaskCreatePinnedToCore(guiTask, "gui", 4096*2, NULL, 0, NULL, 1); // this is graphics handling task pinned to core 1
+
+    xTaskCreate(takeImg, "img task", 2048, NULL, 2, NULL);
+    xTaskCreate(fingerprintTask, "fingerprint task", 4096, NULL, 1, NULL);
     xTaskCreate(networkStatusTask, "network status task", 4000, NULL, 1, NULL);
     mailBox = xQueueCreate(1, sizeof(NOTIFIER)); // creating mailbox with 1 NOTIFIER space.
 
@@ -387,10 +581,224 @@ void app_main(void)
         ESP_LOGI(MAILBOX_TAG, "spiffs mailbox could not created \n");
     }
 
+    uint8_t confirmation_code = 0;
+    confirmation_code = VfyPwd(default_address, default_password);      //++ Performs Password Verification with Fingerprint Module
+
+    if (confirmation_code == 0x00)
+    {
+        printf("R307 FINGERPRINT MODULE DETECTED\n");
+    }
+
+    confirmation_code = ReadSysPara(default_address);
+
+    if (confirmation_code == 0x00)
+    {
+        printf("R307 System Parameter Read!\n");
+    }
+   
+
     /*Load mapping data from the flash*/
-    xEventGroupSetBits(spiffs_event_group , LOAD_MAPPING_BIT); 
+    //xEventGroupSetBits(spiffs_event_group , LOAD_MAPPING_BIT); 
     //xEventGroupSetBits(spiffs_event_group , FLASH_FLUSHING_BIT);
     //printf("finger to vu_id : %s" , get_vu_id(&id_mapping , 5));
+}
+
+/* all the graphics related work is here*/
+
+SemaphoreHandle_t xGuiSemaphore;
+
+static void guiTask(void *pvParameter) {
+    
+    (void) pvParameter;
+    xGuiSemaphore = xSemaphoreCreateMutex();
+
+    lv_init();
+    
+    /* Initialize SPI or I2C bus used by the drivers */
+    lvgl_driver_init();
+
+    static lv_color_t buf1[DISP_BUF_SIZE];
+
+    /* Use double buffered when not working with monochrome displays */
+    static lv_color_t buf2[DISP_BUF_SIZE];
+
+
+    static lv_disp_draw_buf_t disp_buf;
+
+    uint32_t size_in_px = DISP_BUF_SIZE;
+
+    /* Initialize the working buffer depending on the selected display.
+     * NOTE: buf2 == NULL when using monochrome displays. */
+    lv_disp_draw_buf_init(&disp_buf, buf1, buf2, size_in_px);
+
+    lv_disp_drv_t disp_drv;
+    lv_disp_drv_init(&disp_drv);
+    disp_drv.flush_cb = disp_driver_flush;
+
+
+    disp_drv.draw_buf = &disp_buf;
+    lv_disp_drv_register(&disp_drv);
+
+    /* Create and start a periodic timer interrupt to call lv_tick_inc */
+    const esp_timer_create_args_t periodic_timer_args = {
+        .callback = &lv_tick_task,
+        .name = "periodic_gui"
+    };
+    esp_timer_handle_t periodic_timer;
+    ESP_ERROR_CHECK(esp_timer_create(&periodic_timer_args, &periodic_timer));
+    ESP_ERROR_CHECK(esp_timer_start_periodic(periodic_timer, LV_TICK_PERIOD_MS * 1000));
+
+    /* Create the demo application */
+    static const lv_font_t * font_large; 
+
+    font_large = &lv_font_montserrat_32;
+    lv_obj_t * img1 = lv_img_create(lv_scr_act());
+    lv_img_set_src(img1, &art);
+    lv_obj_align(img1, LV_ALIGN_CENTER, 0, 0);
+    lv_obj_set_size(img1, 370, 250);
+
+    lv_obj_t * title = lv_label_create(img1);
+    lv_obj_set_align(title , LV_ALIGN_CENTER);
+    lv_obj_set_style_text_color(title, lv_color_hex(0xffffff), 0);
+    lv_obj_set_style_text_font(title, font_large, 0);
+    lv_obj_set_style_text_line_space(title, 8, 0);
+    
+    uint32_t count = 0;
+    uint32_t time_lapse = 0;
+
+    lv_obj_t* mbox1 = NULL;
+    lv_obj_t* check_obj = NULL;
+    bool msgbox_created = false;
+    bool img_created = false;
+
+ 
+    while (1) {
+
+        /* Delay 1 tick (assumes FreeRTOS tick is 10ms */
+        vTaskDelay(pdMS_TO_TICKS(10));
+        count++;
+        ds1307_get_time(&dev, &mytime);
+        lv_label_set_text_fmt(title , "%02d: %02d: %02d\n%02d-%02d-%04d",
+                            mytime.tm_hour, mytime.tm_min, mytime.tm_sec , 
+                            mytime.tm_mday , mytime.tm_mon , mytime.tm_year + 1900);
+        if ((msgbox_created == false) &&  (finger_msg == FINGERPRINT_SUCCESS)) {
+            time_lapse = count;
+
+            mbox1 = create_msgbox(img1 ,"Fingerprint" , "Success!");
+            check_obj = create_img(img1 , &check);
+            twoShortBeeps();
+            msgbox_created = true;
+            img_created = true;
+            finger_msg = 0x00;
+            printf("msg box created!\n");
+        }
+        else if ((msgbox_created == false) &&  (finger_msg == FINGERPRINT_NOT_MACHING)) {
+            time_lapse = count;
+            mbox1 = create_msgbox(img1 ,"Fingerprint" , "No Matching Fingerprint!");
+            check_obj = create_img(img1 , &remove_icon);
+            threeShortBeeps();
+            msgbox_created = true;
+            img_created = true;
+            finger_msg = 0x00;
+            printf("msg box created!\n");
+
+        }
+        else if ((msgbox_created == false) && (finger_msg == FINGERPRINT_RELEASE_MSG)) {
+            time_lapse = count;
+            mbox1 = create_msgbox(img1 ,"Fingerprint" , "Please Release the finger!");
+            msgbox_created = true;
+            finger_msg = 0x00;
+            printf("msg box created!\n");
+
+
+        }
+        else if ((msgbox_created == false) && (finger_msg == FINGERPRINT_ENROLL_ERROR)) {
+            time_lapse = count;
+            mbox1 = create_msgbox(img1 ,"Fingerprint" , "ENROLL ERROR!\nPlease try again.");
+            check_obj = create_img(img1 , &remove_icon);
+            threeShortBeeps();
+            msgbox_created = true;
+            img_created = true;
+            finger_msg = 0x00;
+            printf("msg box created!\n");
+
+        }
+        else if ((msgbox_created == false) && (finger_msg == FINGERPRINT_SENCOND_PRINT)) {
+            time_lapse = count;
+            mbox1 = create_msgbox(img1 ,"Fingerprint" , "Please put the same finger on the sensor.");
+            msgbox_created = true;
+            finger_msg = 0x00;
+            printf("msg box created!\n");
+
+        }
+        else if ((msgbox_created == false) && (finger_msg == FINGERPRINT_STORE_SUCCESS)) {
+            time_lapse = count;
+            mbox1 = create_msgbox(img1 ,"Fingerprint" , "Fingerprints Stored Successfully!.");
+            check_obj = create_img(img1 , &check);
+            img_created = true;
+            msgbox_created = true;
+            finger_msg = 0x00;
+            printf("msg box created!\n");
+
+        }
+        
+
+        if ((count - time_lapse) == FINGERPRINT_NOTI_DELAY && msgbox_created == true) {
+            lv_obj_del(mbox1);
+            if (img_created == true) {
+                lv_obj_del(check_obj);
+                img_created = false;
+            }
+            
+            msgbox_created = false;
+            printf("msg box deleted!\n");
+        }
+        if (finger_msg == FINGERPRINT_RELEASE_CODE && msgbox_created == true) {
+            lv_obj_del(mbox1);
+            msgbox_created = false;
+            printf("msg box deleted!\n");
+
+        }
+        
+        
+
+        /* Try to take the semaphore, call lvgl related function on success */
+        if (pdTRUE == xSemaphoreTake(xGuiSemaphore, portMAX_DELAY)) {
+            lv_task_handler();
+            xSemaphoreGive(xGuiSemaphore);
+       }
+    }
+
+    /* this task should NEVER return */
+    vTaskDelete(NULL);
+}
+
+// lvgl heart beat
+static void lv_tick_task(void *arg) {
+    (void) arg;
+
+    lv_tick_inc(LV_TICK_PERIOD_MS);
+}
+
+lv_obj_t* create_msgbox(lv_obj_t* bck_img , const char* title , const char* msg)
+{
+    lv_obj_t* msgbox = lv_msgbox_create(bck_img, title, msg, NULL, false);
+    lv_obj_set_height(msgbox , 150);
+    lv_obj_set_width(msgbox , 200);
+    lv_obj_center(msgbox);
+
+    return msgbox;
+
+
+}
+lv_obj_t* create_img(lv_obj_t* bck_img , const lv_img_dsc_t* icon_scr)
+{
+    lv_obj_t* icon = lv_img_create(bck_img);
+    lv_img_set_src(icon , icon_scr);
+    lv_obj_align(icon, LV_ALIGN_CENTER, 0, 30);
+    lv_obj_set_size(icon , 50 , 50);
+
+    return icon;
 }
 
 

@@ -27,6 +27,31 @@ char* serialize_it(device_config_t* dConfig)
 
 // }
 
+struct tm date_time_parser(char* date_str , char* time_str)
+{
+    struct tm mytime = {0};
+
+    if (strptime(date_str, "%Y-%m-%d", &mytime) == NULL) {
+        fprintf(stderr, "Failed to parse date string: %s\n", date_str);
+        exit(EXIT_FAILURE);
+    }
+    strptime(time_str, "%H:%M", &mytime);
+
+    printf("Year: %d\n", mytime.tm_year + 1900);
+    printf("Month: %d\n", mytime.tm_mon + 1);
+    printf("Day: %d\n", mytime.tm_mday);
+    printf("Hour: %d\n", mytime.tm_hour);
+    printf("Min: %d\n", mytime.tm_min);
+    printf("Sec: %d\n", mytime.tm_sec);
+
+
+
+    return mytime;
+
+
+
+}
+
 const char* str_replace(char* str, const char* old, const char* new) {
     // allocate memory for the result string
     int old_len = strlen(old);

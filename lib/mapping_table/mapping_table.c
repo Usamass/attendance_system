@@ -56,7 +56,7 @@ char* deserialize_it(mapping_t* id_mapping , mapping_strct* mp_strct)
 
         }
     
-
+        free(mp_strct->vu_id_st);
         id_mapping->mapping_arr = cJSON_Print(id_mapping->root);
 
         return id_mapping->mapping_arr;    
