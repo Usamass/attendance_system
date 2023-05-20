@@ -13,5 +13,6 @@
 #define MIN(a, b) (((a) < (b)) ? (a) : (b))
 
 esp_err_t getStudentsData(device_config_t);
+esp_err_t sendAttendance(device_config_t , char* attendance);
 
 #endif

@@ -14,6 +14,7 @@
 #include "../SWH_data_buffers.h"
 #include "../SWH_eventGroups.h"
 #include "../event_bits.h"
+#include "../SWH_event_flags.h"
 #include "swh_utility.h"
 #include <ds1307.h>
 
@@ -345,10 +346,12 @@ static esp_err_t enroll_student(httpd_req_t* req)
 {
     char buf[50];
     cJSON* root2 = NULL;
+    char* vu_id = NULL;
 
     int response = 0;
     int tamp_count;
 
+     
     mp_struct.vu_id_st = (char*)malloc(sizeof(char) * 15);
     int ret, remaining = req->content_len;
 
@@ -365,21 +368,30 @@ static esp_err_t enroll_student(httpd_req_t* req)
         ESP_LOGI(JSON_TAG, "Deserialize the reponse");
         root2 = cJSON_Parse(buf);
         if (cJSON_GetObjectItem(root2, "vu_id")) {
-            mp_struct.vu_id_st = cJSON_GetObjectItem(root2,"vu_id")->valuestring;
-            ESP_LOGI(JSON_TAG, "vu_id=%s",mp_struct.vu_id_st);
+            vu_id = cJSON_GetObjectItem(root2,"vu_id")->valuestring;
+            ESP_LOGI(JSON_TAG, "vu_id=%s",vu_id);
         
-            mp_struct.f_id_st = 9;
+            //mp_struct.f_id_st = 9;
+            memcpy(mp_struct.vu_id_st , vu_id, strlen(vu_id));
+            printf("vu_id=%d" , strlen(vu_id));
+            mp_struct.vu_id_st[strlen(vu_id)] = '\0';
             tamp_count = get_tamp_count(&id_mapping , mp_struct.vu_id_st);
 
             if (tamp_count != -1) {   // if this vu_id is already there.
                 ESP_LOGI(HTTP_SERVER_TAG , "vu_id already exist!\n");
                 if (tamp_count < MAX_TAMPLATES) {
                     ESP_LOGI(HTTP_SERVER_TAG , "tamplate count is less then 2!\n");
-                    xEventGroupSetBits(spiffs_event_group , CLIENT_RECIEVED_BIT);
+                    // set operational bit to 1 for enrollment
+                    opt_flag = 1;
+                    // send msg to display for enrollment
+                    disp_msg = FINGERPRINT_ENROLL_CODE;
+
+                    //xEventGroupSetBits(spiffs_event_group , CLIENT_RECIEVED_BIT);
 
                 }
                 else {
                     ESP_LOGI(HTTP_SERVER_TAG , "max tamplate count is already achieved!\n");
+                    disp_msg = FINGERPRINT_MAX_TAMP;
 
                     // send msg that max count of tamplate is already achieved.
                 }
@@ -388,7 +400,11 @@ static esp_err_t enroll_student(httpd_req_t* req)
             }
             else { // new vu_id.
                 ESP_LOGI(HTTP_SERVER_TAG , "new vu_id");
-                xEventGroupSetBits(spiffs_event_group , CLIENT_RECIEVED_BIT);
+                // set operational bit to 1 for enrollment
+                opt_flag = 1;
+                // send msg to display for enrollment
+                disp_msg = FINGERPRINT_ENROLL_CODE;                
+                // xEventGroupSetBits(spiffs_event_group , CLIENT_RECIEVED_BIT);
 
 
 
@@ -409,7 +425,7 @@ void swh_server_init()
 {
    
     httpd_config_t server_config = HTTPD_DEFAULT_CONFIG();
-    server_config.max_uri_handlers = 10;   // setting max uri handlers to 10
+    server_config.max_uri_handlers = 11;   // setting max uri handlers to 11
     httpd_handle_t server_handle = NULL;
     ESP_LOGI(HTTP_SERVER_TAG, "Starting server on port: '%d'", server_config.server_port);
 

@@ -50,7 +50,7 @@
 #define TAG "LVGL_TAG"
 #define LV_TICK_PERIOD_MS 1
 #define FINGERPRINT_INPUT_PIN 34
-#define FINGERPRINT_NOTI_DELAY 50
+#define FINGERPRINT_NOTI_DELAY 20
 #define GOT_F_ID 5
 
 
@@ -58,28 +58,22 @@
 // static const char *HTTP_SERVER_TAG = "SWH_HTTP_TEST";
 // esp_err_t getStudentsData(device_config_t);
 
-QueueHandle_t mailBox;
 QueueHandle_t spiffs_mailBox;
 extern device_config_t dConfig; // device ip and mac will be set on connect to network.
 extern uint16_t template_number;   // getting templete number from fingerprint library
+extern uint16_t page_id;
+
 bool shared_bit_f = false;
 EventGroupHandle_t spiffs_event_group;
 EventGroupHandle_t fingerprint_event;
 mapping_t id_mapping;
 mapping_strct mp_struct;
-uint8_t finger_msg = 0x00;
-static uint8_t opt_flag = 0;/* <- do'nt forget this*/
+uint8_t disp_msg = 0x00;
+uint8_t opt_flag;
 
 
 i2c_dev_t dev;
-struct tm mytime = {
-    .tm_year = 123, //(2022 - 1900)
-    .tm_mon  = 04,  
-    .tm_mday = 10,
-    .tm_hour = 8,
-    .tm_min  = 33,
-    .tm_sec  = 30
-    };
+struct tm mytime;
   
 // #define EXAMPLE_ESP_MAXIMUM_RETRY (5)
 // #define EXAMPLE_HTTP_QUERY_KEY_MAX_LEN (64)
@@ -152,6 +146,7 @@ static void fingerprintTask(void* args){
     
         f_bit = xEventGroupWaitBits(fingerprint_event , FINGERPRINT_DONE_EVENT_BIT , pdTRUE , pdFALSE , portMAX_DELAY);
         if ((f_bit & FINGERPRINT_DONE_EVENT_BIT) != 0){
+            ESP_LOGI(F_TAG , "value of opt_flag=%d" , opt_flag);
             if (opt_flag){
                 /* Enrollment logic */ 
                 count++;
@@ -159,10 +154,10 @@ static void fingerprintTask(void* args){
                 sprintf(temp_str , "%d" , template_number +1);
                 if (count <= 2){
                     sprintf(int_str , "%d" , count);
-                    finger_msg = FINGERPRINT_RELEASE_MSG;
+                    disp_msg = FINGERPRINT_RELEASE_MSG;
                     ESP_LOGI(F_TAG , "Please Release the finger! count: %d\n" , count);
                     while (gpio_get_level(FINGERPRINT_INPUT_PIN) != 1);
-                    finger_msg = FINGERPRINT_RELEASE_CODE;
+                    disp_msg = FINGERPRINT_RELEASE_CODE;
                     ESP_LOGI(F_TAG , "finger released!\n");
                     confirmation_code = Img2Tz(default_address , int_str);
                     if (confirmation_code == 0x00){
@@ -170,31 +165,36 @@ static void fingerprintTask(void* args){
                             confirmation_code = RegModel(default_address);
                             if (confirmation_code == 0x00){
                                 confirmation_code = Store(default_address , "1" , temp_str); // page id field is variable
-                                // mp_struct.f_id = template_number;
-                                // xEventGroupSetBit(spiffs_task , GOT_FINGER_ID); 
                                 if (confirmation_code != 0x00){
                                     count = 0;
                                     opt_flag = 0;
-                                    finger_msg = FINGERPRINT_ENROLL_ERROR;
+                                    disp_msg = FINGERPRINT_ENROLL_ERROR;
+                                    free(mp_struct.vu_id_st);
                                 }
                                 else {
-                                    finger_msg = FINGERPRINT_STORE_SUCCESS;
+                                    disp_msg = FINGERPRINT_STORE_SUCCESS;
+                                    mp_struct.f_id_st = template_number;     // assign fingerid to mp_struct variable.
+                                    opt_flag = 0; // reset to attendance.
+
+                                    xEventGroupSetBits(spiffs_event_group , CLIENT_RECIEVED_BIT);  // store the mapping.
                                 }
                                 count = 0;
                             }
                             else {
                                 count = 0;
-                                finger_msg = FINGERPRINT_ENROLL_ERROR;
+                                disp_msg = FINGERPRINT_ENROLL_ERROR;
+                                free(mp_struct.vu_id_st);
                             }
                         }
                         else {
-                            finger_msg = FINGERPRINT_SENCOND_PRINT;
+                            disp_msg = FINGERPRINT_SENCOND_PRINT;
                             ESP_LOGI(F_TAG , "Please put same finger on the sensor!\n");
                         }
                     }
                     else {
                         count = 0;
-                        finger_msg = FINGERPRINT_ENROLL_ERROR;
+                        disp_msg = FINGERPRINT_ENROLL_ERROR;
+                        free(mp_struct.vu_id_st);
                     }
                 
                 
@@ -212,23 +212,24 @@ static void fingerprintTask(void* args){
                 if (confirmation_code == 0x00){
                     confirmation_code = Search(default_address , "1" , "0" , int_str);
                     if (confirmation_code == 0x00){
-                        ds1307_get_time(&dev, &mytime);
-                        printf("%04d-%02d-%02d %02d:%02d:%02d\n", mytime.tm_year + 1900 /*Add 1900 for better readability*/, mytime.tm_mon + 1,
-                        mytime.tm_mday, mytime.tm_hour, mytime.tm_min, mytime.tm_sec);
-                        finger_msg = FINGERPRINT_SUCCESS;  // fingerprint match 
-                        //xEventGroupSetBits(mapping_event , GOT_F_ID);
-                       
+                        // ds1307_get_time(&dev, &mytime);
+                        // printf("%04d-%02d-%02d %02d:%02d:%02d\n", mytime.tm_year + 1900 /*Add 1900 for better readability*/, mytime.tm_mon + 1,
+                        // mytime.tm_mday, mytime.tm_hour, mytime.tm_min, mytime.tm_sec);
+                        char* attendance = attendanceToJson(get_vu_id(&id_mapping , page_id));
+                        printf("%s page_id: %d" , attendance , page_id);
+                        sendAttendance(dConfig , attendance);
+                        disp_msg = FINGERPRINT_SUCCESS;  // fingerprint match.                        
 
                     }
                     else {
                         threeShortBeeps();
-                        finger_msg = FINGERPRINT_NOT_MACHING;  // no fingerprint matches
+                        disp_msg = FINGERPRINT_NOT_MACHING;  // no fingerprint matches
                     }
                     
                 }
                 else {
                     threeShortBeeps();
-                    finger_msg = 0x03; // image error try again
+                    disp_msg = 0x03; // image error try again
 
                 }
 
@@ -243,8 +244,7 @@ static void fingerprintTask(void* args){
 
 static void networkStatusTask(void *pvParameter)
 {
-    BaseType_t mailBox_status;
-    NOTIFIER noti;
+    
     while (true)
     {
         EventBits_t connectBits = xEventGroupWaitBits(
@@ -256,81 +256,19 @@ static void networkStatusTask(void *pvParameter)
         if ((connectBits & GOT_IP_BIT) != 0)
         {
             ESP_LOGI(HTTP_CLIENT_TAG, "initializting Server\n");
-            noti.val = GOT_IP_FLAG;
-            noti.msg = "got ip address";
+            // send got ip address msg to display
             swh_server_init();
-            // getStudentsData(dConfig);
 
-            
-            mailBox_status = xQueueSend(mailBox, &noti, portMAX_DELAY);
-            if (mailBox_status != pdPASS)
-            {
-                ESP_LOGI(MAILBOX_TAG, "Could not send to the queue \n");
-            }
         }
         else if ((connectBits & ETHERNET_CONNECTED_BIT) != 0)
         {
-            noti.val = ETHERNET_CONNECT_FLAG;
-            noti.msg = "Ethernet connected!";
-            ESP_LOGI("SWH_ethernet", "Ethernet connected\n");
-
-            mailBox_status = xQueueSend(mailBox, &noti, portMAX_DELAY);
-            if (mailBox_status != pdPASS)
-            {
-                ESP_LOGI(MAILBOX_TAG, "Could not send to the queue \n");
-            }
+            // send ethernet connected msg to display.
+            
         }
         else
         {
-            noti.val = ETHERNET_DISCONNECT_FLAG;
-            noti.msg = "Ethernet disconnected!";
-            ESP_LOGI("SWH_ethernet", "Ethernet disconnected\n");
-
-            mailBox_status = xQueueSend(mailBox, &noti, portMAX_DELAY);
-            if (mailBox_status != pdPASS)
-            {
-                ESP_LOGI(MAILBOX_TAG, "Could not send to the queue \n");
-            }
-        }
-    }
-}
-
-//-------------------------------------This task will display the notifications to LCD ----------------------------
-
-static void displayNotification() // This task will wait for the data appeare in mainbox queue
-{
-    BaseType_t mailBox_status;
-    NOTIFIER noti;
-
-    while (true)
-    {
-        mailBox_status = xQueueReceive(mailBox, &noti, portMAX_DELAY);
-        if (mailBox_status == pdPASS)
-        {
-            ESP_LOGI(MAILBOX_TAG, "data reveived from mailbox : value = %d \t msg = %s \n", noti.val, noti.msg);
-        }
-        else
-        {
-            ESP_LOGI(MAILBOX_TAG, "could not receive from the mailbox \n");
-        }
-    }
-}
-// This notifier Task will notify all the activity on the device to lcd display as notifications.
-static void notifierTask()
-{
-    NOTIFIER noti = {
-        .val = 10,
-        .msg = "from notifier task"};
-    BaseType_t mailbox_status;
-
-    while (true)
-    {
-
-        vTaskDelay(pdMS_TO_TICKS(500));
-        mailbox_status = xQueueSend(mailBox, &noti, portMAX_DELAY);
-        if (mailbox_status != pdPASS)
-        {
-            ESP_LOGI(MAILBOX_TAG, "Could not send to the queue \n");
+            // send msg to display for ethernet disconnect
+        
         }
     }
 }
@@ -349,7 +287,8 @@ static void db_interface_task()
             pdFALSE,
             portMAX_DELAY);
         if ((requestBits & CLIENT_RECIEVED_BIT) != 0){
-            
+            spiffs_noti.data = (char*)malloc(sizeof(char) * 50);
+
             DataSource_t dataSrc = CLIENT;
             spiffs_noti.data_scr = dataSrc;
             spiffs_noti.flag_type = CLIENT_WRITE_FLAG;
@@ -425,6 +364,7 @@ static void spiffs_task()
                         fprintf(f, spiffs_noti.data);
                         fclose(f);
                         free(spiffs_noti.data);
+                        free(mp_struct.vu_id_st);
                         ESP_LOGI(TAG_exe, "File written");
                     }
                 }
@@ -466,15 +406,15 @@ static void spiffs_task()
                     long size = ftell(f);   // get file size
                     fseek(f, 0L, SEEK_SET); // move file pointer back to beginning of file
                     
-                    id_mapping.mapping_arr = (char *)malloc(size); // allocate memory for buffer
-                    if (id_mapping.mapping_arr == NULL)
+                    if (size <= 0)
                     {
-                        ESP_LOGI(TAG_exe, "No data inside /spiffs/stdData.txt\n");
+                        id_mapping.mapping_arr = NULL;
+                        ESP_LOGI(TAG_exe, "No data inside /spiffs/stdData.txt size = %lu\n" , size);
                         fclose(f);
                         //return;
                     }
                     else {
-
+                        id_mapping.mapping_arr = (char *)malloc(size); // allocate memory for buffer
                         size_t result = fread(id_mapping.mapping_arr, 1, size, f); // read file into buffer
                         if (result != size)
                         {
@@ -491,7 +431,7 @@ static void spiffs_task()
                         parse_mapping(&id_mapping);
                         //get_vu_id(&id_mapping , 6);
 
-                        free(id_mapping.mapping_arr);
+                        //free(id_mapping.mapping_arr);
                     }
                 }
 
@@ -525,8 +465,7 @@ void app_main(void)
     ESP_ERROR_CHECK(i2cdev_init());  // initializing i2c driver for rtc module.
     memset(&dev, 0, sizeof(i2c_dev_t));
     ESP_ERROR_CHECK(ds1307_init_desc(&dev, 0, 21, 22));
-    ESP_ERROR_CHECK(ds1307_set_time(&dev, &mytime)); 
-
+    
     spiffs_event_group = xEventGroupCreate();
     xEventGroupClearBits(
         spiffs_event_group, 
@@ -551,28 +490,28 @@ void app_main(void)
     
     xTaskCreatePinnedToCore(guiTask, "gui", 4096*2, NULL, 0, NULL, 1); // this is graphics handling task pinned to core 1
 
-    xTaskCreate(takeImg, "img task", 2048, NULL, 2, NULL);
+    xTaskCreate(takeImg, "img task", 4096, NULL, 2, NULL);
     xTaskCreate(fingerprintTask, "fingerprint task", 4096, NULL, 1, NULL);
     xTaskCreate(networkStatusTask, "network status task", 4000, NULL, 1, NULL);
-    mailBox = xQueueCreate(1, sizeof(NOTIFIER)); // creating mailbox with 1 NOTIFIER space.
+    // mailBox = xQueueCreate(1, sizeof(NOTIFIER)); // creating mailbox with 1 NOTIFIER space.
 
-    if (mailBox != NULL)
-    {
-        ESP_LOGI(MAILBOX_TAG, "mailbox has been created!\n");
-        xTaskCreate(notifierTask, "notifier-task", 2048, NULL, 1, NULL);
-        xTaskCreate(displayNotification, "display-notification", 2048, NULL, 4, NULL);
-    }
-    else
-    {
+    // if (mailBox != NULL)
+    // {
+    //     ESP_LOGI(MAILBOX_TAG, "mailbox has been created!\n");
+    //     xTaskCreate(notifierTask, "notifier-task", 2048, NULL, 1, NULL);
+    //     xTaskCreate(displayNotification, "display-notification", 2048, NULL, 4, NULL);
+    // }
+    // else
+    // {
 
-        ESP_LOGI(MAILBOX_TAG, "mailbox could not created \n");
-    }
+    //     ESP_LOGI(MAILBOX_TAG, "mailbox could not created \n");
+    // }
     spiffs_mailBox = xQueueCreate(1, sizeof(SPIFFS_NOTIFIER)); // creating mailbox with 1 NOTIFIER space.
 
     if (spiffs_mailBox != NULL)
     {
         ESP_LOGI(MAILBOX_TAG, "spiffs mailbox has been created!\n");
-        xTaskCreate(db_interface_task, "db-interface-task", 2048, NULL, 1, NULL);
+        xTaskCreate(db_interface_task, "db-interface-task", 4048, NULL, 1, NULL);
         xTaskCreate(spiffs_task, "spiffs task", 4048, NULL, 3, NULL);
     }
     else
@@ -598,9 +537,9 @@ void app_main(void)
    
 
     /*Load mapping data from the flash*/
-    //xEventGroupSetBits(spiffs_event_group , LOAD_MAPPING_BIT); 
+    xEventGroupSetBits(spiffs_event_group , LOAD_MAPPING_BIT); 
     //xEventGroupSetBits(spiffs_event_group , FLASH_FLUSHING_BIT);
-    //printf("finger to vu_id : %s" , get_vu_id(&id_mapping , 5));
+    //Empty(default_address);
 }
 
 /* all the graphics related work is here*/
@@ -681,7 +620,7 @@ static void guiTask(void *pvParameter) {
         lv_label_set_text_fmt(title , "%02d: %02d: %02d\n%02d-%02d-%04d",
                             mytime.tm_hour, mytime.tm_min, mytime.tm_sec , 
                             mytime.tm_mday , mytime.tm_mon , mytime.tm_year + 1900);
-        if ((msgbox_created == false) &&  (finger_msg == FINGERPRINT_SUCCESS)) {
+        if ((msgbox_created == false) &&  (disp_msg == FINGERPRINT_SUCCESS)) {
             time_lapse = count;
 
             mbox1 = create_msgbox(img1 ,"Fingerprint" , "Success!");
@@ -689,55 +628,72 @@ static void guiTask(void *pvParameter) {
             twoShortBeeps();
             msgbox_created = true;
             img_created = true;
-            finger_msg = 0x00;
+            disp_msg = 0x00;
             printf("msg box created!\n");
         }
-        else if ((msgbox_created == false) &&  (finger_msg == FINGERPRINT_NOT_MACHING)) {
+        else if ((msgbox_created == false) &&  (disp_msg == FINGERPRINT_NOT_MACHING)) {
             time_lapse = count;
             mbox1 = create_msgbox(img1 ,"Fingerprint" , "No Matching Fingerprint!");
             check_obj = create_img(img1 , &remove_icon);
             threeShortBeeps();
             msgbox_created = true;
             img_created = true;
-            finger_msg = 0x00;
+            disp_msg = 0x00;
             printf("msg box created!\n");
 
         }
-        else if ((msgbox_created == false) && (finger_msg == FINGERPRINT_RELEASE_MSG)) {
+        else if ((msgbox_created == false) && (disp_msg == FINGERPRINT_RELEASE_MSG)) {
             time_lapse = count;
             mbox1 = create_msgbox(img1 ,"Fingerprint" , "Please Release the finger!");
             msgbox_created = true;
-            finger_msg = 0x00;
+            disp_msg = 0x00;
             printf("msg box created!\n");
 
 
         }
-        else if ((msgbox_created == false) && (finger_msg == FINGERPRINT_ENROLL_ERROR)) {
+        else if ((msgbox_created == false) && (disp_msg == FINGERPRINT_ENROLL_ERROR)) {
             time_lapse = count;
             mbox1 = create_msgbox(img1 ,"Fingerprint" , "ENROLL ERROR!\nPlease try again.");
             check_obj = create_img(img1 , &remove_icon);
             threeShortBeeps();
             msgbox_created = true;
             img_created = true;
-            finger_msg = 0x00;
+            disp_msg = 0x00;
             printf("msg box created!\n");
 
         }
-        else if ((msgbox_created == false) && (finger_msg == FINGERPRINT_SENCOND_PRINT)) {
+        else if ((msgbox_created == false) && (disp_msg == FINGERPRINT_SENCOND_PRINT)) {
             time_lapse = count;
             mbox1 = create_msgbox(img1 ,"Fingerprint" , "Please put the same finger on the sensor.");
             msgbox_created = true;
-            finger_msg = 0x00;
+            disp_msg = 0x00;
             printf("msg box created!\n");
 
         }
-        else if ((msgbox_created == false) && (finger_msg == FINGERPRINT_STORE_SUCCESS)) {
+        else if ((msgbox_created == false) && (disp_msg == FINGERPRINT_STORE_SUCCESS)) {
             time_lapse = count;
             mbox1 = create_msgbox(img1 ,"Fingerprint" , "Fingerprints Stored Successfully!.");
             check_obj = create_img(img1 , &check);
             img_created = true;
             msgbox_created = true;
-            finger_msg = 0x00;
+            disp_msg = 0x00;
+            printf("msg box created!\n");
+
+        }
+        else if ((msgbox_created == false) && (disp_msg == FINGERPRINT_ENROLL_CODE)) {
+            time_lapse = count;
+            mbox1 = create_msgbox(img1 ,"Fingerprint" , "Please put your finger on the sensor.");
+            msgbox_created = true;
+            disp_msg = 0x00;
+            //opt_flag = 0; // reset the flage to attendance
+            printf("msg box created!\n");
+
+        }
+        else if ((msgbox_created == false) && (disp_msg == FINGERPRINT_MAX_TAMP)) {
+            time_lapse = count;
+            mbox1 = create_msgbox(img1 ,"Fingerprint" , "Max Tamplate count is already achieved!");
+            msgbox_created = true;
+            disp_msg = 0x00;
             printf("msg box created!\n");
 
         }
@@ -753,7 +709,7 @@ static void guiTask(void *pvParameter) {
             msgbox_created = false;
             printf("msg box deleted!\n");
         }
-        if (finger_msg == FINGERPRINT_RELEASE_CODE && msgbox_created == true) {
+        if (disp_msg == FINGERPRINT_RELEASE_CODE && msgbox_created == true) {
             lv_obj_del(mbox1);
             msgbox_created = false;
             printf("msg box deleted!\n");

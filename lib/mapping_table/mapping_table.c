@@ -3,7 +3,9 @@
 
 char* deserialize_it(mapping_t* id_mapping , mapping_strct* mp_strct)
 {  
+    printf("vu_id in mapping table %s" , mp_strct->vu_id_st);
     if (id_mapping->mapping_arr == NULL){
+        //id_mapping->mapping_arr = (char*)malloc(sizeof(char) * ALLOC_SIZE);
         printf("inside null mapping\n");
         id_mapping->root = cJSON_CreateArray();
         id_mapping->size_of_arr = 0;
@@ -24,6 +26,7 @@ char* deserialize_it(mapping_t* id_mapping , mapping_strct* mp_strct)
     }
     else {
 
+        //id_mapping->mapping_arr = (char*)realloc(id_mapping->mapping_arr , sizeof(char) * ALLOC_SIZE); 
         printf("inside mapping\n");
         cJSON* first_object;
         int tmpl = 0;
@@ -56,7 +59,7 @@ char* deserialize_it(mapping_t* id_mapping , mapping_strct* mp_strct)
 
         }
     
-        free(mp_strct->vu_id_st);
+        //free(mp_strct->vu_id_st);
         id_mapping->mapping_arr = cJSON_Print(id_mapping->root);
 
         return id_mapping->mapping_arr;    
@@ -101,26 +104,38 @@ int get_finger_id(mapping_t* id_mapping , const char* id)
 
 }
 
-void get_vu_id(mapping_t* id_mapping , int f_id)
+char* get_vu_id(mapping_t* id_mapping , int f_id)
 {
-    printf("getting vu_id : %d" , f_id);
-    cJSON* obj = cJSON_GetArrayItem(id_mapping->root , 2);
-
-
-    if (f_id == cJSON_GetObjectItem(obj , "f_id_1")->valueint){
-        printf("vu_id_1 : %s" , cJSON_GetObjectItem(obj , "vu_id")->valuestring);
-    }
-    else if (cJSON_GetObjectItem(obj , "f_id_2")) {
-        if (f_id == cJSON_GetObjectItem(obj , "f_id_2")->valueint){
-            printf("vu_id_2 : %s" , cJSON_GetObjectItem(obj , "vu_id")->valuestring);
-
-
-        }
-    }
-
-
+    cJSON* obj = NULL;
+    cJSON* arr_item = NULL;
+    char* vu_id = (char*)malloc(sizeof(char) * 20);
+    printf("getting vu_id : %d\n" , f_id);
+    obj = cJSON_Parse(id_mapping->mapping_arr);
+    printf("size of cJSON array: %d\n" , cJSON_GetArraySize(obj));
     
+    for(int i = 0 ; i < cJSON_GetArraySize(obj) ; i++){
+        printf("inside for loop of mapping_table\n");
 
+        arr_item = cJSON_GetArrayItem(id_mapping->root , i);
+        if (f_id == cJSON_GetObjectItem(arr_item , "f_id_1")->valueint){
+            //printf("vu_id_1 : %s\n" , vu_id = cJSON_GetObjectItem(arr_item , "vu_id")->valuestring);
+            vu_id = cJSON_GetObjectItem(arr_item , "vu_id")->valuestring;
+            printf("from mapping_table %s" , vu_id);
+            return vu_id;
+        }
+        else if (cJSON_GetObjectItem(arr_item , "f_id_2")) {
+            if (f_id == cJSON_GetObjectItem(arr_item , "f_id_2")->valueint){
+                //printf("vu_id_2 : %s" ,
+                vu_id = cJSON_GetObjectItem(arr_item , "vu_id")->valuestring;
+                printf("from mapping_table %s" , vu_id);
+                return vu_id;
+
+
+            }
+        }
+        
+    }
+    return NULL;
 
 }
 

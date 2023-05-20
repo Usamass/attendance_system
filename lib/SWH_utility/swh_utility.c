@@ -78,3 +78,32 @@ const char* str_replace(char* str, const char* old, const char* new) {
 
     return result;
 }
+
+char* attendanceToJson(char* vu_id) 
+{
+    char time_stamp[30] = {0};
+    char* attendance = malloc(sizeof(char) * 50);
+    ds1307_get_time(&dev, &mytime);
+    //2023-04-23T18:35:43Z
+    //"timestamp": "2023-04-23T18:35:43.511Z"
+
+    sprintf(time_stamp , "%04d-%02d-%02dT%02d:%02d:%02dZ", mytime.tm_year + 1900 , mytime.tm_mon
+    , mytime.tm_mday , mytime.tm_hour , mytime.tm_min , mytime.tm_sec);
+
+    printf("%s\n" , time_stamp);
+        
+
+    cJSON* first_object;
+    first_object = cJSON_CreateObject();
+
+    cJSON_AddStringToObject(first_object , "student_id" , vu_id);
+    cJSON_AddStringToObject(first_object , "timestamp" , time_stamp);
+
+    attendance = cJSON_Print(first_object);
+    cJSON_Delete(first_object);
+    //free(vu_id);
+
+    return attendance;
+
+    
+}

@@ -5,6 +5,7 @@
 #include "cJSON.h"
 #include "../SWH_custom_data_structs.h"
 
+#define ALLOC_SIZE 50
 typedef struct {
     cJSON* root;
     char* mapping_arr;
@@ -13,7 +14,7 @@ typedef struct {
 }mapping_t;
 
 char* deserialize_it(mapping_t* , mapping_strct*);
-void get_vu_id(mapping_t* id_mapping , int f_id);
+char* get_vu_id(mapping_t* id_mapping , int f_id);
 int get_mapping_size(mapping_t* id_mapping);
 int get_tamp_count(mapping_t* id_mapping , const char* id);
 int get_finger_id(mapping_t* id_mapping , const char* id);

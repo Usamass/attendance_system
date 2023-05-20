@@ -16,6 +16,7 @@ static const int RX_BUF_SIZE = 2048;            //++ UART RX Buffer Size
 static const char *R307_TX = "R307_TX";         //++ UART RX TAG
 
 uint16_t template_number = 0;                   //++ declaring it global so it can be used in other files.
+uint16_t page_id = 0;
 
 
 void r307_response_parser(char instruction_code[], uint8_t received_package[]);
@@ -1294,7 +1295,6 @@ void r307_response_parser(char instruction_code[], uint8_t received_package[])
     {
         if(confirmation_code == 0x00)
         {
-            uint16_t page_id = 0;
             uint16_t match_score = 0;
             ESP_LOGI("Search", "(0x00H) FOUND MATCHING FINGER");
 

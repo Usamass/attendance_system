@@ -12,4 +12,7 @@ extern mapping_strct mp_struct;
 extern mapping_t id_mapping;
 extern i2c_dev_t dev;
 extern struct tm mytime;
+extern uint8_t disp_msg;
+extern uint8_t opt_flag;
+extern char* vu_id;
 #endif /*_DATA_BUFFER_H*/

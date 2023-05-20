@@ -23,7 +23,7 @@ esp_err_t _http_event_handler(esp_http_client_event_t *evt)
         ESP_LOGI(HTTP_CLIENT_TAG, "HTTP_EVENT_ON_HEADER, key=%s, value=%s", evt->header_key, evt->header_value);
         break;
     case HTTP_EVENT_ON_DATA:
-        // content_len = evt->data_len;
+        content_len = evt->data_len;
         // ESP_LOGI(HTTP_CLIENT_TAG, "HTTP_EVENT_ON_DATA, len=%d", evt->data_len);
         // ESP_LOGI(HTTP_CLIENT_TAG, "HTTP_RESPONSE_DATA: %s \n", (char *)evt->data);
         /*
@@ -165,6 +165,48 @@ esp_err_t getStudentsData(device_config_t dConfig)
         return ESP_FAIL;
     }
     ESP_LOG_BUFFER_HEX(HTTP_CLIENT_TAG, client_receive_buffer, strlen(client_receive_buffer));
+
+    return ESP_OK;
+}
+
+
+esp_err_t sendAttendance(device_config_t dConfig , char* attendance)
+{
+
+    esp_err_t err;
+    
+
+    esp_http_client_config_t config = {
+        .host = "192.168.50.209",
+        // .host = "ade01b9d-fb0e-4117-a267-ff752ee8812d.mock.pstmn.io",
+        // .path = "/sendAttendance",
+        .url = "http://192.168.50.209:8000/api/attendancedumps/create",
+        .method = HTTP_METHOD_POST,
+        .event_handler = _http_event_handler,
+    };
+    esp_http_client_handle_t client = esp_http_client_init(&config);
+    esp_http_client_set_header(client , "token" , "ZIE1At1Ww66I2Q3");
+    esp_http_client_set_header(client , "Content-Type" , "application/json");
+    esp_http_client_set_post_field(client , attendance , strlen(attendance));
+    err = esp_http_client_perform(client);
+
+    if (err == ESP_OK)
+    {
+        int status_code = esp_http_client_get_status_code(client);
+
+        ESP_LOGI(HTTP_CLIENT_TAG, "HTTP GET Status = %d", status_code);
+        if (status_code == 200)
+        {
+            printf("status code : %d" , status_code);
+            
+        }
+    }
+    else
+    {
+        ESP_LOGE(HTTP_CLIENT_TAG, "HTTP GET request failed: %s", esp_err_to_name(err));
+
+        return ESP_FAIL;
+    }
 
     return ESP_OK;
 }
