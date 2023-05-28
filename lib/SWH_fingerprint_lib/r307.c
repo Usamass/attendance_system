@@ -1040,7 +1040,7 @@ void r307_response_parser(char instruction_code[], uint8_t received_package[])
             ESP_LOGI("TempleteNum", "(0x00H) READ COMPLETE");
 
             template_number = received_package[10] + received_package[11];
-            ESP_LOGW("SYSTEM PARAMETER", "Template Number - %d\n", template_number);
+            ESP_LOGW("SYSTEM PARAMETER", "Template Number : %d\n", template_number);
         }
         else if(confirmation_code == 0x01)
         {

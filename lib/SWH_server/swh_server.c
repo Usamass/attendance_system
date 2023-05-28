@@ -16,6 +16,7 @@
 #include "../event_bits.h"
 #include "../SWH_event_flags.h"
 #include "swh_utility.h"
+#include "sys_beeps.h"
 #include <ds1307.h>
 
 #define MAX_TAMPLATES 2
@@ -36,6 +37,7 @@ static bool login_flag = false;
 
 esp_err_t login_page(httpd_req_t *req)
 {
+    shortBeep();
     int response;
    
     response = httpd_resp_send(req, loginPage, HTTPD_RESP_USE_STRLEN);
@@ -43,6 +45,7 @@ esp_err_t login_page(httpd_req_t *req)
 }
 static esp_err_t user_credentials_handler(httpd_req_t *req)
 {
+    shortBeep();
     char buf[100];
     char* username = NULL;
     char* password = NULL;
@@ -104,6 +107,7 @@ static esp_err_t user_credentials_handler(httpd_req_t *req)
 }
 esp_err_t dashboard_handler(httpd_req_t *req)
 {
+    shortBeep();
     int response;
     const char* un_authMsg = "Please login first";
     char client_ip[INET6_ADDRSTRLEN];
@@ -134,7 +138,9 @@ esp_err_t dashboard_handler(httpd_req_t *req)
 
 }
 
-esp_err_t logout_handler(httpd_req_t *req){
+esp_err_t logout_handler(httpd_req_t *req)
+{
+    shortBeep();
     /*every time the user logout the ipstr will be all 0's*/
     memset(&ipstr, 0, sizeof(ipstr)); 
     ESP_LOGI("remip" , "%s" , ipstr);
@@ -144,7 +150,9 @@ esp_err_t logout_handler(httpd_req_t *req){
     return response;
 }
 
-esp_err_t get_network(httpd_req_t *req){
+esp_err_t get_network(httpd_req_t *req)
+{
+    shortBeep();
     int response;
     const char* un_authMsg = "Please login first";
 
@@ -182,6 +190,7 @@ esp_err_t get_network(httpd_req_t *req){
 
 esp_err_t get_device_configs(httpd_req_t* req)
 {
+    shortBeep();
     char buf[200];
     cJSON* root2 = NULL;
 
@@ -242,7 +251,9 @@ esp_err_t get_device_configs(httpd_req_t* req)
 
 }
 
-esp_err_t enrollment_page(httpd_req_t* req){
+esp_err_t enrollment_page(httpd_req_t* req)
+{
+    shortBeep();
     int response;
     const char* un_authMsg = "Please login first";
 
@@ -274,7 +285,9 @@ esp_err_t enrollment_page(httpd_req_t* req){
 
 
 }
-esp_err_t get_std_data(httpd_req_t* req){
+esp_err_t get_std_data(httpd_req_t* req)
+{
+    shortBeep();
     ESP_LOGI(HTTP_SERVER_TAG , "inside get std data handler!\n");
     int response;
     getStudentsData(dConfig);   
@@ -283,7 +296,9 @@ esp_err_t get_std_data(httpd_req_t* req){
     
 }
 
-esp_err_t get_date_time(httpd_req_t* req){
+esp_err_t get_date_time(httpd_req_t* req)
+{
+    shortBeep();
     char buf[50];
     int response;
     struct tm current_time;
@@ -344,6 +359,7 @@ esp_err_t get_date_time(httpd_req_t* req){
 
 static esp_err_t enroll_student(httpd_req_t* req)
 {
+    shortBeep();
     char buf[50];
     cJSON* root2 = NULL;
     char* vu_id = NULL;

@@ -172,10 +172,9 @@ esp_err_t getStudentsData(device_config_t dConfig)
 
 esp_err_t sendAttendance(device_config_t dConfig , char* attendance)
 {
+    const char *auth = getAuthToken(&dConfig);
 
     esp_err_t err;
-    
-
     esp_http_client_config_t config = {
         .host = "192.168.50.209",
         // .host = "ade01b9d-fb0e-4117-a267-ff752ee8812d.mock.pstmn.io",
@@ -185,7 +184,7 @@ esp_err_t sendAttendance(device_config_t dConfig , char* attendance)
         .event_handler = _http_event_handler,
     };
     esp_http_client_handle_t client = esp_http_client_init(&config);
-    esp_http_client_set_header(client , "token" , "ZIE1At1Ww66I2Q3");
+    esp_http_client_set_header(client , "token" , auth);
     esp_http_client_set_header(client , "Content-Type" , "application/json");
     esp_http_client_set_post_field(client , attendance , strlen(attendance));
     err = esp_http_client_perform(client);

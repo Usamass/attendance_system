@@ -151,7 +151,7 @@ static void fingerprintTask(void* args){
                 /* Enrollment logic */ 
                 count++;
                 TempleteNum(default_address);
-                sprintf(temp_str , "%d" , template_number +1);
+                sprintf(temp_str , "%d" , (template_number +1));
                 if (count <= 2){
                     sprintf(int_str , "%d" , count);
                     disp_msg = FINGERPRINT_RELEASE_MSG;
@@ -173,8 +173,11 @@ static void fingerprintTask(void* args){
                                 }
                                 else {
                                     disp_msg = FINGERPRINT_STORE_SUCCESS;
-                                    mp_struct.f_id_st = template_number;     // assign fingerid to mp_struct variable.
+                                    twoShortBeeps();
+                                    mp_struct.f_id_st = atoi(temp_str);   // assign fingerid to mp_struct variable.
                                     opt_flag = 0; // reset to attendance.
+                                    printf("temp_str: %s - f_id_st :%d" , temp_str , mp_struct.f_id_st);
+                                    
 
                                     xEventGroupSetBits(spiffs_event_group , CLIENT_RECIEVED_BIT);  // store the mapping.
                                 }
@@ -183,6 +186,7 @@ static void fingerprintTask(void* args){
                             else {
                                 count = 0;
                                 disp_msg = FINGERPRINT_ENROLL_ERROR;
+                                threeShortBeeps();
                                 free(mp_struct.vu_id_st);
                             }
                         }
@@ -194,6 +198,7 @@ static void fingerprintTask(void* args){
                     else {
                         count = 0;
                         disp_msg = FINGERPRINT_ENROLL_ERROR;
+                        threeShortBeeps();
                         free(mp_struct.vu_id_st);
                     }
                 
@@ -203,14 +208,14 @@ static void fingerprintTask(void* args){
             else {
                 /*attendance logic*/
                 TempleteNum(default_address);
-                sprintf(int_str , "%d" , template_number);
+                sprintf(int_str , "%d" , (template_number +2));
                 // ESP_LOGI(F_TAG , "Please Release the finger! templete: %s ", int_str);
                 // while (gpio_get_level(FINGERPRINT_INPUT_PIN) != 1);
                 // ESP_LOGI(F_TAG , "finger released!\n");
                 
                 confirmation_code = Img2Tz(default_address , "1");
                 if (confirmation_code == 0x00){
-                    confirmation_code = Search(default_address , "1" , "0" , int_str);
+                    confirmation_code = Search(default_address , "1" , "1" , int_str);
                     if (confirmation_code == 0x00){
                         // ds1307_get_time(&dev, &mytime);
                         // printf("%04d-%02d-%02d %02d:%02d:%02d\n", mytime.tm_year + 1900 /*Add 1900 for better readability*/, mytime.tm_mon + 1,
@@ -218,7 +223,8 @@ static void fingerprintTask(void* args){
                         char* attendance = attendanceToJson(get_vu_id(&id_mapping , page_id));
                         printf("%s page_id: %d" , attendance , page_id);
                         sendAttendance(dConfig , attendance);
-                        disp_msg = FINGERPRINT_SUCCESS;  // fingerprint match.                        
+                        disp_msg = FINGERPRINT_SUCCESS;  //notify when server mark attendance // fingerprint match. 
+                        twoShortBeeps();                       
 
                     }
                     else {
@@ -258,16 +264,22 @@ static void networkStatusTask(void *pvParameter)
             ESP_LOGI(HTTP_CLIENT_TAG, "initializting Server\n");
             // send got ip address msg to display
             swh_server_init();
+            disp_msg = GOT_IP_FLAG;
+            shortBeep();
 
         }
         else if ((connectBits & ETHERNET_CONNECTED_BIT) != 0)
         {
             // send ethernet connected msg to display.
+            disp_msg = ETHERNET_CONNECT_FLAG;
+            shortBeep();
             
         }
         else
         {
             // send msg to display for ethernet disconnect
+            disp_msg = ETHERNET_DISCONNECT_FLAG;
+            longBeep();
         
         }
     }
@@ -366,6 +378,8 @@ static void spiffs_task()
                         free(spiffs_noti.data);
                         free(mp_struct.vu_id_st);
                         ESP_LOGI(TAG_exe, "File written");
+                        xEventGroupSetBits(spiffs_event_group , LOAD_MAPPING_BIT); 
+
                     }
                 }
                 
@@ -387,7 +401,8 @@ static void spiffs_task()
                         free(spiffs_noti.data);
                         ESP_LOGI(TAG_exe, "File written");
                         // task that is waiting for the spiffs operation to be done will be signaled
-                        // xEventGroupSetBits(spiffs_event_group , SPIFFS_OPERATION_DONE);
+                        
+                        
                     }
                 }
             }
@@ -459,6 +474,7 @@ void app_main(void)
 {
     // init(); // this function will initialize all the configs on device.
     rgbConfig();
+    init_buzzer();
     r307_init();            // initializing uart for r307 fingerprint sensor.
     swh_eth_init();         // initializing ethernet hardware.
     swh_file_system_init(); // initializing file system.
@@ -535,11 +551,12 @@ void app_main(void)
         printf("R307 System Parameter Read!\n");
     }
    
-
+    vTaskDelay(pdMS_TO_TICKS(100));
     /*Load mapping data from the flash*/
     xEventGroupSetBits(spiffs_event_group , LOAD_MAPPING_BIT); 
     //xEventGroupSetBits(spiffs_event_group , FLASH_FLUSHING_BIT);
     //Empty(default_address);
+    TempleteNum(default_address);
 }
 
 /* all the graphics related work is here*/
@@ -697,6 +714,31 @@ static void guiTask(void *pvParameter) {
             printf("msg box created!\n");
 
         }
+        else if ((msgbox_created == false) && (disp_msg == ETHERNET_CONNECT_FLAG)) {
+            time_lapse = count;
+            mbox1 = create_msgbox(img1 ,"<-Ethernet->" , "Ethernet connected!");
+            msgbox_created = true;
+            disp_msg = 0x00;
+            printf("msg box created!\n");
+
+        }
+        else if ((msgbox_created == false) && (disp_msg == ETHERNET_DISCONNECT_FLAG)) {
+            time_lapse = count;
+            mbox1 = create_msgbox(img1 ,"<-Ethernet->" , "Ethernet disconnected!");
+            msgbox_created = true;
+            disp_msg = 0x00;
+            printf("msg box created!\n");
+
+        }
+        else if ((msgbox_created == false) && (disp_msg == GOT_IP_FLAG)) {
+            time_lapse = count;
+            mbox1 = create_msgbox(img1 ,"<-IP->" , "IP Received!");
+            msgbox_created = true;
+            disp_msg = 0x00;
+            printf("msg box created!\n");
+
+        }
+        
         
 
         if ((count - time_lapse) == FINGERPRINT_NOTI_DELAY && msgbox_created == true) {
@@ -711,6 +753,10 @@ static void guiTask(void *pvParameter) {
         }
         if (disp_msg == FINGERPRINT_RELEASE_CODE && msgbox_created == true) {
             lv_obj_del(mbox1);
+            if (img_created == true) {
+                lv_obj_del(check_obj);
+                img_created = false;
+            }
             msgbox_created = false;
             printf("msg box deleted!\n");
 

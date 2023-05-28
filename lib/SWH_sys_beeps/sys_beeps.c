@@ -9,16 +9,20 @@ void init_buzzer(){
 void shortBeep() {
     // Generate a short beep (50-100ms)
     gpio_set_level(BEEP_GPIO_PIN, 1); // Turn on the buzzer
+    setRGBLED(1 , 1 , 0);
     vTaskDelay(50 / portTICK_PERIOD_MS); // Wait for 50ms
     gpio_set_level(BEEP_GPIO_PIN, 0); // Turn off the buzzer
+    setRGBLED(1 , 1 , 1);
     vTaskDelay(50 / portTICK_PERIOD_MS); // Wait for 50ms
 }
 
 void longBeep() {
     // Generate a long beep (500-1000ms)
     gpio_set_level(BEEP_GPIO_PIN, 1); // Turn on the buzzer
+    setRGBLED(0 , 1 , 1);
     vTaskDelay(500 / portTICK_PERIOD_MS); // Wait for 500ms
     gpio_set_level(BEEP_GPIO_PIN, 0); // Turn off the buzzer
+    setRGBLED(1 , 1 , 1);
     vTaskDelay(500 / portTICK_PERIOD_MS); // Wait for 500ms
 }
 
@@ -51,8 +55,10 @@ void threeShortBeeps() {
     // Generate three short beeps (100-200ms each)
     for(int i = 0; i < 3; i++) { // Repeat 3 times
         gpio_set_level(BEEP_GPIO_PIN, 1); // Turn on the buzzer
+        setRGBLED(0 , 1 , 1);
         vTaskDelay(100 / portTICK_PERIOD_MS); // Wait for 100ms
         gpio_set_level(BEEP_GPIO_PIN, 0); // Turn off the buzzer
+        setRGBLED(1 , 1 , 1);
         vTaskDelay(100 / portTICK_PERIOD_MS); // Wait for 100ms
     }
     vTaskDelay(500 / portTICK_PERIOD_MS); // Wait for 500ms before repeating
@@ -83,8 +89,10 @@ void twoShortBeeps() {
     // Generate five short beeps (100-200ms each)
     for(int i = 0; i < 2; i++) {
         gpio_set_level(BEEP_GPIO_PIN, 1); // Turn on the buzzer
+        setRGBLED(1 , 0 , 1);
         vTaskDelay(100 / portTICK_PERIOD_MS); // Wait for 100ms
         gpio_set_level(BEEP_GPIO_PIN, 0); // Turn off the buzzer
+        setRGBLED(1 , 1 , 1);
         vTaskDelay(100 / portTICK_PERIOD_MS); // Wait for 100ms
     }
     vTaskDelay(500 / portTICK_PERIOD_MS); // Wait for 500ms before repeating
