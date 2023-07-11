@@ -328,6 +328,7 @@ esp_err_t get_date_time(httpd_req_t* req)
         if (cJSON_GetObjectItem(root2, "time")) {
             time = cJSON_GetObjectItem(root2,"time")->valuestring;
             ESP_LOGI(JSON_TAG, "time=%s",time);
+            printf("daf");
         }
 
         current_time = date_time_parser(date , time);
