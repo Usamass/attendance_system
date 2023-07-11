@@ -333,7 +333,7 @@ esp_err_t get_date_time(httpd_req_t* req)
         current_time = date_time_parser(date , time);
         
         mytime.tm_year = current_time.tm_year;
-        mytime.tm_mon  = current_time.tm_mon;  
+        mytime.tm_mon  = current_time.tm_mon +1;  
         mytime.tm_mday = current_time.tm_mday;
         mytime.tm_hour = current_time.tm_hour;
         mytime.tm_min  = current_time.tm_min;
