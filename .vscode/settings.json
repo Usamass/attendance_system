@@ -20,7 +20,9 @@
         "swh_data_buffers.h": "c",
         "ds1307.h": "c",
         "r307.h": "c",
-        "esp_freertos_hooks.h": "c"
+        "esp_freertos_hooks.h": "c",
+        "memory_resource": "c",
+        "sstream": "c"
     },
     "C_Cpp.errorSquiggles": "disabled"
 }
