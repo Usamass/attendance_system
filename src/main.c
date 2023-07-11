@@ -191,8 +191,19 @@ static void fingerprintTask(void* args){
                             }
                         }
                         else {
-                            disp_msg = FINGERPRINT_SENCOND_PRINT;
-                            ESP_LOGI(F_TAG , "Please put same finger on the sensor!\n");
+                            confirmation_code = Search(default_address , "1" , "1" , temp_str);
+                            if (confirmation_code == 0x00){
+                                disp_msg = FINGERPRINT_ALREADY_THERE;
+                                ESP_LOGI(F_TAG , "Fingerprint is already registered!\n");
+                                count = 0;
+                                opt_flag = 0; // reset to attendance
+                            }
+                            else {
+                                disp_msg = FINGERPRINT_SENCOND_PRINT;
+                                ESP_LOGI(F_TAG , "Please put same finger on the sensor!\n");
+                            }
+                          
+
                         }
                     }
                     else {
@@ -299,8 +310,6 @@ static void db_interface_task()
             pdFALSE,
             portMAX_DELAY);
         if ((requestBits & CLIENT_RECIEVED_BIT) != 0){
-            spiffs_noti.data = (char*)malloc(sizeof(char) * 50);
-
             DataSource_t dataSrc = CLIENT;
             spiffs_noti.data_scr = dataSrc;
             spiffs_noti.flag_type = CLIENT_WRITE_FLAG;
@@ -375,7 +384,6 @@ static void spiffs_task()
                         }
                         fprintf(f, spiffs_noti.data);
                         fclose(f);
-                        free(spiffs_noti.data);
                         free(mp_struct.vu_id_st);
                         ESP_LOGI(TAG_exe, "File written");
                         xEventGroupSetBits(spiffs_event_group , LOAD_MAPPING_BIT); 
@@ -640,7 +648,7 @@ static void guiTask(void *pvParameter) {
         if ((msgbox_created == false) &&  (disp_msg == FINGERPRINT_SUCCESS)) {
             time_lapse = count;
 
-            mbox1 = create_msgbox(img1 ,"Fingerprint" , "Success!");
+            mbox1 = create_msgbox(img1 ,"<-Fingerprint->" , "Success!");
             check_obj = create_img(img1 , &check);
             twoShortBeeps();
             msgbox_created = true;
@@ -650,7 +658,7 @@ static void guiTask(void *pvParameter) {
         }
         else if ((msgbox_created == false) &&  (disp_msg == FINGERPRINT_NOT_MACHING)) {
             time_lapse = count;
-            mbox1 = create_msgbox(img1 ,"Fingerprint" , "No Matching Fingerprint!");
+            mbox1 = create_msgbox(img1 ,"<-Fingerprint->" , "No Matching Fingerprint!");
             check_obj = create_img(img1 , &remove_icon);
             threeShortBeeps();
             msgbox_created = true;
@@ -661,7 +669,7 @@ static void guiTask(void *pvParameter) {
         }
         else if ((msgbox_created == false) && (disp_msg == FINGERPRINT_RELEASE_MSG)) {
             time_lapse = count;
-            mbox1 = create_msgbox(img1 ,"Fingerprint" , "Please Release the finger!");
+            mbox1 = create_msgbox(img1 ,"<-Fingerprint->" , "Please Release the finger!");
             msgbox_created = true;
             disp_msg = 0x00;
             printf("msg box created!\n");
@@ -670,7 +678,7 @@ static void guiTask(void *pvParameter) {
         }
         else if ((msgbox_created == false) && (disp_msg == FINGERPRINT_ENROLL_ERROR)) {
             time_lapse = count;
-            mbox1 = create_msgbox(img1 ,"Fingerprint" , "ENROLL ERROR!\nPlease try again.");
+            mbox1 = create_msgbox(img1 ,"<-Fingerprint->" , "ENROLL ERROR!\nPlease try again.");
             check_obj = create_img(img1 , &remove_icon);
             threeShortBeeps();
             msgbox_created = true;
@@ -681,7 +689,7 @@ static void guiTask(void *pvParameter) {
         }
         else if ((msgbox_created == false) && (disp_msg == FINGERPRINT_SENCOND_PRINT)) {
             time_lapse = count;
-            mbox1 = create_msgbox(img1 ,"Fingerprint" , "Please put the same finger on the sensor.");
+            mbox1 = create_msgbox(img1 ,"<-Fingerprint->" , "Please put the same finger on the sensor.");
             msgbox_created = true;
             disp_msg = 0x00;
             printf("msg box created!\n");
@@ -689,7 +697,7 @@ static void guiTask(void *pvParameter) {
         }
         else if ((msgbox_created == false) && (disp_msg == FINGERPRINT_STORE_SUCCESS)) {
             time_lapse = count;
-            mbox1 = create_msgbox(img1 ,"Fingerprint" , "Fingerprints Stored Successfully!.");
+            mbox1 = create_msgbox(img1 ,"<-Fingerprint->" , "Fingerprints Stored Successfully!.");
             check_obj = create_img(img1 , &check);
             img_created = true;
             msgbox_created = true;
@@ -699,7 +707,7 @@ static void guiTask(void *pvParameter) {
         }
         else if ((msgbox_created == false) && (disp_msg == FINGERPRINT_ENROLL_CODE)) {
             time_lapse = count;
-            mbox1 = create_msgbox(img1 ,"Fingerprint" , "Please put your finger on the sensor.");
+            mbox1 = create_msgbox(img1 ,"<-Fingerprint->" , "Please put your finger on the sensor.");
             msgbox_created = true;
             disp_msg = 0x00;
             //opt_flag = 0; // reset the flage to attendance
@@ -708,7 +716,7 @@ static void guiTask(void *pvParameter) {
         }
         else if ((msgbox_created == false) && (disp_msg == FINGERPRINT_MAX_TAMP)) {
             time_lapse = count;
-            mbox1 = create_msgbox(img1 ,"Fingerprint" , "Max Tamplate count is already achieved!");
+            mbox1 = create_msgbox(img1 ,"<-Fingerprint->" , "Max Tamplate count is already achieved!");
             msgbox_created = true;
             disp_msg = 0x00;
             printf("msg box created!\n");
@@ -733,6 +741,14 @@ static void guiTask(void *pvParameter) {
         else if ((msgbox_created == false) && (disp_msg == GOT_IP_FLAG)) {
             time_lapse = count;
             mbox1 = create_msgbox(img1 ,"<-IP->" , "IP Received!");
+            msgbox_created = true;
+            disp_msg = 0x00;
+            printf("msg box created!\n");
+
+        }
+        else if ((msgbox_created == false) && (disp_msg == FINGERPRINT_ALREADY_THERE)) {
+            time_lapse = count;
+            mbox1 = create_msgbox(img1 ,"<-Fingerprint->" , "Fingerprint is already registered!");
             msgbox_created = true;
             disp_msg = 0x00;
             printf("msg box created!\n");
