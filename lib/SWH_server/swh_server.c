@@ -38,9 +38,10 @@ static bool login_flag = false;
 esp_err_t login_page(httpd_req_t *req)
 {
     shortBeep();
-    int response;
-   
-    response = httpd_resp_send(req, loginPage, HTTPD_RESP_USE_STRLEN);
+    int response = 0;
+    response = httpd_resp_send(req, new_html_files[0], HTTPD_RESP_USE_STRLEN);
+        
+    
     return response;
 }
 static esp_err_t user_credentials_handler(httpd_req_t *req)
@@ -117,6 +118,7 @@ esp_err_t dashboard_handler(httpd_req_t *req)
 	memset(&saddr, 0, sizeof(saddr)); // Clear it to be sure
 	socklen_t saddr_len = sizeof(saddr);
 
+
 	if(getpeername(socket, (struct sockaddr *)&saddr, &saddr_len) == 0)
 	{
         inet_ntop(AF_INET, &saddr.sin6_addr.un.u32_addr[3], client_ip, sizeof(client_ip));
@@ -124,7 +126,7 @@ esp_err_t dashboard_handler(httpd_req_t *req)
     }
     
     if (strcmp(ipstr , client_ip) == 0){
-    response = httpd_resp_send(req, dashboard, HTTPD_RESP_USE_STRLEN);
+    response = httpd_resp_send(req, new_html_files[1], HTTPD_RESP_USE_STRLEN);
     return response;
     }
     else {
@@ -264,6 +266,7 @@ esp_err_t enrollment_page(httpd_req_t* req)
 	memset(&saddr, 0, sizeof(saddr)); // Clear it to be sure
 	socklen_t saddr_len = sizeof(saddr);
 
+
 	if(getpeername(socket, (struct sockaddr *)&saddr, &saddr_len) == 0)
 	{
         inet_ntop(AF_INET, &saddr.sin6_addr.un.u32_addr[3], client_ip, sizeof(client_ip));
@@ -271,7 +274,7 @@ esp_err_t enrollment_page(httpd_req_t* req)
     }
 
     if (strcmp(ipstr , client_ip) == 0){
-        response = httpd_resp_send(req , enrollmentPage , HTTPD_RESP_USE_STRLEN);
+        response = httpd_resp_send(req , new_html_files[2] , HTTPD_RESP_USE_STRLEN);
         return response;
 
     } 

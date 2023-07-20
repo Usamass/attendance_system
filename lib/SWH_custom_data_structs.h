@@ -16,7 +16,8 @@ typedef enum
     FINGER_PRINT,
     DEVICE_CONFIGS,
     LOAD_MAPPING,
-    FLASH_FLUSH
+    FLASH_FLUSH,
+    HTML_FILES
 } DataSource_t;
 
 typedef struct {

@@ -6,7 +6,7 @@
 #define MAX_DEVICE_CONFIG_BUFFER (50)
 
 char* serialize_it(device_config_t* dConfig);
-const char* str_replace();
+char* str_replace(char* str, const char* old, const char* new);
 struct tm date_time_parser(char* date_str , char* time_str);
 char* attendanceToJson(char* vu_id);
 

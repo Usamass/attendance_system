@@ -15,4 +15,5 @@ extern struct tm mytime;
 extern uint8_t disp_msg;
 extern uint8_t opt_flag;
 extern char* vu_id;
+extern const char* new_html_files[3];
 #endif /*_DATA_BUFFER_H*/

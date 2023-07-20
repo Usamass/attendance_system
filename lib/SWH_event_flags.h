@@ -5,6 +5,9 @@
 #define CLIENT_READ_FLAG (0x08)
 #define DEVICE_CONFIG_WRITE_FLAG (0x04)
 #define LOAD_MAPPING_FLAG (0x05)
+#define HTML_FILE_READ (0x15)
+#define HTML_FILE_WRITE (0x16)
+
 // Fingerprint flags
 #define FINGERPRINT_SUCCESS 0x01
 #define FINGERPRINT_NOT_MACHING 0x02

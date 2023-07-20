@@ -1,4 +1,5 @@
 #include <string.h>
+#include <esp_log.h>
 #include "swh_utility.h"
 #include "device_configs.h"
 #include "cJSON.h"
@@ -52,11 +53,11 @@ struct tm date_time_parser(char* date_str , char* time_str)
 
 }
 
-const char* str_replace(char* str, const char* old, const char* new) {
+char* str_replace(char* str, const char* old, const char* new) {
     // allocate memory for the result string
     int old_len = strlen(old);
     int new_len = strlen(new);
-    int size = strlen(str) + 1;
+    int size = strlen(str) + 100;
     char* result = (char*) malloc(size);
 
     // iterate over the input string, copying characters to the result string
@@ -69,13 +70,13 @@ const char* str_replace(char* str, const char* old, const char* new) {
             strncpy(q, new, new_len);
             q += new_len;
             p += old_len;
-        } else {
+        } 
+        else{
             // copy the current character into the result string
             *q++ = *p++;
         }
     }
     *q = '\0';  // terminate the result string
-
     return result;
 }
 

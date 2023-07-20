@@ -22,6 +22,7 @@
 #include "../SWH_custom_data_structs.h"
 #include "../SWH_event_flags.h"
 #include "../SWH_data_buffers.h"
+// #include "../SWH_web_pages.h"
 #include "device_configs.h"
 #include "swh_file_system.h"
 #include "swh_utility.h"
@@ -62,6 +63,9 @@ QueueHandle_t spiffs_mailBox;
 extern device_config_t dConfig; // device ip and mac will be set on connect to network.
 extern uint16_t template_number;   // getting templete number from fingerprint library
 extern uint16_t page_id;
+extern char loginPage[];
+extern char dashboard[];
+extern char enrollmentPage[];
 
 bool shared_bit_f = false;
 EventGroupHandle_t spiffs_event_group;
@@ -90,6 +94,15 @@ static const char *HTTP_CLIENT_TAG = "http client";
 static const char *MAILBOX_TAG = "mailbox";
 static const char *TAG_exe = "spiffs";
 static const char* F_TAG = "finger tag";
+char* html_files[] = {
+                        "/spiffs/html_pages/login_page.txt" , 
+                        "/spiffs/html_pages/dashboard_page.txt" , 
+                        "/spiffs/html_pages/enrollment_page.txt"
+                     };
+char* html_ptr[] = {&loginPage , &dashboard , &enrollmentPage};
+                /*   login_page , dashboard_page , enrollment_page*/
+                /*           |            |               | */
+const char* new_html_files[3] = {NULL ,        NULL ,          NULL};
 // static const char *JSON_TAG = "JSON";
 
 char default_address[4] = {0xFF, 0xFF, 0xFF, 0xFF};         //++ Default Module Address is FF:FF:FF:FF
@@ -176,7 +189,7 @@ static void fingerprintTask(void* args){
                                     twoShortBeeps();
                                     mp_struct.f_id_st = atoi(temp_str);   // assign fingerid to mp_struct variable.
                                     opt_flag = 0; // reset to attendance.
-                                    printf("temp_str: %s - f_id_st :%d" , temp_str , mp_struct.f_id_st);
+                                    ESP_LOGI(F_TAG , "temp_str: %s - f_id_st :%d" , temp_str , mp_struct.f_id_st);
                                     
 
                                     xEventGroupSetBits(spiffs_event_group , CLIENT_RECIEVED_BIT);  // store the mapping.
@@ -272,6 +285,12 @@ static void networkStatusTask(void *pvParameter)
             portMAX_DELAY);
         if ((connectBits & GOT_IP_BIT) != 0)
         {
+            // initializing html webpages as ip address received.
+            new_html_files[0] = str_replace(loginPage , "_IP" , getIpAddr(&dConfig));
+            // ESP_LOGI("str_html" , "%s" , new_html_files[0]);
+            new_html_files[1] = str_replace(dashboard , "_IP" , getIpAddr(&dConfig));
+            // ESP_LOGI("str_html" , "%s" , new_html_files[1]);
+            new_html_files[2] = str_replace(enrollmentPage , "_IP" , getIpAddr(&dConfig));
             ESP_LOGI(HTTP_CLIENT_TAG, "initializting Server\n");
             // send got ip address msg to display
             swh_server_init();
@@ -305,7 +324,7 @@ static void db_interface_task()
     {
         EventBits_t requestBits = xEventGroupWaitBits(
             spiffs_event_group,
-            CLIENT_RECIEVED_BIT | DEVICE_CONFIG_BIT | LOAD_MAPPING_BIT | FLASH_FLUSHING_BIT, // add other event bit as the application grows.
+            CLIENT_RECIEVED_BIT | DEVICE_CONFIG_BIT | LOAD_MAPPING_BIT | FLASH_FLUSHING_BIT | HTML_FILE_BIT, // add other event bit as the application grows.
             pdTRUE,
             pdFALSE,
             portMAX_DELAY);
@@ -348,6 +367,18 @@ static void db_interface_task()
         else if ((requestBits & FLASH_FLUSHING_BIT) != 0){
             DataSource_t dataSrc = FLASH_FLUSH;
             spiffs_noti.data_scr = dataSrc;
+            spiffs_noti.data = NULL;
+
+            mailBox_status = xQueueSend(spiffs_mailBox, &spiffs_noti, portMAX_DELAY);
+            if (mailBox_status != pdPASS){
+                ESP_LOGI(MAILBOX_TAG, "Could not send to the queue \n");
+            }
+
+        }
+        else if ((requestBits & HTML_FILE_BIT) != 0){
+            DataSource_t dataSrc = HTML_FILES;
+            spiffs_noti.data_scr = dataSrc;
+            spiffs_noti.flag_type = HTML_FILE_READ;
             spiffs_noti.data = NULL;
 
             mailBox_status = xQueueSend(spiffs_mailBox, &spiffs_noti, portMAX_DELAY);
@@ -470,14 +501,80 @@ static void spiffs_task()
                 fclose(file);
 
             }
-        }
-        else
-        {
-            ESP_LOGI(MAILBOX_TAG, "could not receive from the mailbox \n");
+            else if (spiffs_noti.data_scr == HTML_FILES)
+            {
+                if (spiffs_noti.flag_type == HTML_FILE_WRITE)
+                {
+                    
+                    ESP_LOGI(TAG_exe, "Opening HTML file");
+                    for (int i = 0 ; i < 3 ; i++) {
+                        FILE *f = fopen(html_files[i], "w");
+                        if (f == NULL)
+                        {
+                            ESP_LOGE(TAG_exe, "Failed to open file for writing");
+                        }
+                        fprintf(f, html_ptr[i]);
+                        fclose(f);
+                        ESP_LOGI(TAG_exe, "File written");
+                    }
+                        
+                        
+                        
+                    
+                }
+                else {
+                    ESP_LOGI(TAG_exe, "Reading html files");
+                    for (int i = 0 ; i < 3 ; i++) {
+                        FILE *f = fopen(html_files[i], "r");
+                        if (f == NULL)
+                        {
+                            ESP_LOGE(TAG_exe, "Failed to open file for reading");
+                            return;
+                        }
+                        fseek(f, 0L, SEEK_END); // move file pointer to end of file
+                        long size = ftell(f);   // get file size
+                        fseek(f, 0L, SEEK_SET); // move file pointer back to beginning of file
+                        
+                        if (size <= 0)
+                        {
+                            ESP_LOGI(TAG_exe, "No data inside %s size = %lu\n" , html_files[i] , size);
+                            fclose(f);
+                            //return;
+                        }
+                        else {
+                            char* file = (char *)malloc(size); // allocate memory for buffer
+                            size_t result = fread(file , 1, size, f); // read file into buffer
+                            if (result != size)
+                            {
+                                ESP_LOGI(TAG_exe, "Error reading %s.\n" , html_files[i]);
+                                free(file);
+                                fclose(f);
+                                return;
+                            }
+
+                            fclose(f); // close the file
+
+                            new_html_files[i] = str_replace(file , "_IP" , getIpAddr(&dConfig));
+                            ESP_LOGI(TAG_exe, "Read from file: '%s' \n %s", html_files[i] , new_html_files[i]);
+
+
+                        }
+
+
+                    }
+
+                    
+
+                }
+            }
+            
+            else
+            {
+                ESP_LOGI(MAILBOX_TAG, "could not receive from the mailbox \n");
+            }
         }
     }
 }
-
 void app_main(void)
 {
     // init(); // this function will initialize all the configs on device.
@@ -512,11 +609,11 @@ void app_main(void)
 
     id_mapping.mapping_arr = NULL; // this is done in init task, where it will point to mapping data from flash
     
-    xTaskCreatePinnedToCore(guiTask, "gui", 4096*2, NULL, 0, NULL, 1); // this is graphics handling task pinned to core 1
+    xTaskCreatePinnedToCore(guiTask, "gui", 4096, NULL, 0, NULL, 1); // this is graphics handling task pinned to core 1
 
-    xTaskCreate(takeImg, "img task", 4096, NULL, 2, NULL);
-    xTaskCreate(fingerprintTask, "fingerprint task", 4096, NULL, 1, NULL);
-    xTaskCreate(networkStatusTask, "network status task", 4000, NULL, 1, NULL);
+    xTaskCreatePinnedToCore(takeImg, "img task", 4096, NULL, 2, NULL , 0);
+    xTaskCreatePinnedToCore(fingerprintTask, "fingerprint task", 4096, NULL, 1, NULL , 0);
+    xTaskCreatePinnedToCore(networkStatusTask, "network status task", 4000, NULL, 1, NULL , 0);
     // mailBox = xQueueCreate(1, sizeof(NOTIFIER)); // creating mailbox with 1 NOTIFIER space.
 
     // if (mailBox != NULL)
@@ -535,8 +632,8 @@ void app_main(void)
     if (spiffs_mailBox != NULL)
     {
         ESP_LOGI(MAILBOX_TAG, "spiffs mailbox has been created!\n");
-        xTaskCreate(db_interface_task, "db-interface-task", 4048, NULL, 1, NULL);
-        xTaskCreate(spiffs_task, "spiffs task", 4048, NULL, 3, NULL);
+        xTaskCreatePinnedToCore(db_interface_task, "db-interface-task", 4048, NULL, 1, NULL , 0);
+        xTaskCreatePinnedToCore(spiffs_task, "spiffs task", 4048, NULL, 3, NULL , 0);
     }
     else
     {
@@ -562,9 +659,16 @@ void app_main(void)
     vTaskDelay(pdMS_TO_TICKS(100));
     /*Load mapping data from the flash*/
     xEventGroupSetBits(spiffs_event_group , LOAD_MAPPING_BIT); 
+    /*Reading HTML files from the flash*/
+    // xEventGroupSetBits(spiffs_event_group , HTML_FILE_BIT);
     //xEventGroupSetBits(spiffs_event_group , FLASH_FLUSHING_BIT);
-    //Empty(default_address);
+    //Empty(default_address);   
     TempleteNum(default_address);
+    
+    // ESP_LOGI("str_html" , "%s" , new_html_files[2]);
+
+
+
 }
 
 /* all the graphics related work is here*/
@@ -740,7 +844,7 @@ static void guiTask(void *pvParameter) {
         }
         else if ((msgbox_created == false) && (disp_msg == GOT_IP_FLAG)) {
             time_lapse = count;
-            mbox1 = create_msgbox(img1 ,"<-IP->" , "IP Received!");
+            mbox1 = create_msgbox(img1 ,"<-IP Received->" , getIpAddr(&dConfig));
             msgbox_created = true;
             disp_msg = 0x00;
             printf("msg box created!\n");
