@@ -393,13 +393,14 @@ static esp_err_t enroll_student(httpd_req_t* req)
         
             //mp_struct.f_id_st = 9;
             memcpy(mp_struct.vu_id_st , vu_id, strlen(vu_id));
-            printf("vu_id=%d" , strlen(vu_id));
+            // printf("vu_id=%d" , strlen(vu_id));
             mp_struct.vu_id_st[strlen(vu_id)] = '\0';
             tamp_count = get_tamp_count(&id_mapping , mp_struct.vu_id_st);
 
             if (tamp_count != -1) {   // if this vu_id is already there.
                 ESP_LOGI(HTTP_SERVER_TAG , "vu_id already exist!\n");
                 if (tamp_count < MAX_TAMPLATES) {
+                    mp_struct.tamp_count = 2;
                     ESP_LOGI(HTTP_SERVER_TAG , "tamplate count is less then 2!\n");
                     // set operational bit to 1 for enrollment
                     opt_flag = 1;
@@ -412,6 +413,7 @@ static esp_err_t enroll_student(httpd_req_t* req)
                 else {
                     ESP_LOGI(HTTP_SERVER_TAG , "max tamplate count is already achieved!\n");
                     disp_msg = FINGERPRINT_MAX_TAMP;
+                    free(mp_struct.vu_id_st);
 
                     // send msg that max count of tamplate is already achieved.
                 }
@@ -419,6 +421,7 @@ static esp_err_t enroll_student(httpd_req_t* req)
                 
             }
             else { // new vu_id.
+                mp_struct.tamp_count = 1;
                 ESP_LOGI(HTTP_SERVER_TAG , "new vu_id");
                 // set operational bit to 1 for enrollment
                 opt_flag = 1;

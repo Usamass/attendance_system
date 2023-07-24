@@ -32,6 +32,7 @@ typedef struct {
 typedef struct {
     char* vu_id_st;
     int f_id_st;
+    int tamp_count;
 
 }mapping_strct;
 

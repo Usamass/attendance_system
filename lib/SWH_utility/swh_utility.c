@@ -3,6 +3,7 @@
 #include "swh_utility.h"
 #include "device_configs.h"
 #include "cJSON.h"
+#include "mapping_table.h"
 
 /* for serializing the data received */
 char* serialize_it(device_config_t* dConfig)
@@ -83,7 +84,7 @@ char* str_replace(char* str, const char* old, const char* new) {
 char* attendanceToJson(char* vu_id) 
 {
     char time_stamp[30] = {0};
-    char* attendance = malloc(sizeof(char) * 50);
+    // char* attendance = malloc(sizeof(char) * 50);
     ds1307_get_time(&dev, &mytime);
     //2023-04-23T18:35:43Z
     //"timestamp": "2023-04-23T18:35:43.511Z"
@@ -100,11 +101,27 @@ char* attendanceToJson(char* vu_id)
     cJSON_AddStringToObject(first_object , "student_id" , vu_id);
     cJSON_AddStringToObject(first_object , "timestamp" , time_stamp);
 
-    attendance = cJSON_Print(first_object);
+    char* attendance = cJSON_Print(first_object);
     cJSON_Delete(first_object);
     //free(vu_id);
 
     return attendance;
+
+    
+}
+char* enrollmentToJson(char* vu_id , int f_count) 
+{  
+    cJSON* first_object;
+    first_object = cJSON_CreateObject();
+
+    cJSON_AddStringToObject(first_object , "student_vuid" , vu_id);
+    cJSON_AddNumberToObject(first_object , "finger_count" , f_count);
+
+    char* enrollment = cJSON_Print(first_object);
+    cJSON_Delete(first_object);
+    //free(vu_id);
+
+    return enrollment;
 
     
 }

@@ -1,4 +1,5 @@
 #include "swh_client.h"
+// #include SERVER_ADDRESS SERVER_ADDRESS
 char* client_receive_buffer = NULL;
 int content_len = 0;
 
@@ -128,10 +129,10 @@ esp_err_t getStudentsData(device_config_t dConfig)
 
     esp_err_t err;
     
-    snprintf(url, sizeof(url), "http://192.168.50.209:8000/api/students/location/%d", locationID);
+    snprintf(url, sizeof(url), "http://%s:%s/api/students/location/%d", SERVER_ADDRESS, SERVER_PORT , locationID);
 
     esp_http_client_config_t config = {
-        .host = "192.168.50.209",
+        .host = SERVER_ADDRESS,
         // .host = "2a85849f-67d6-40e7-a2cc-87c61ef2ac71.mock.pstmn.io",
         // .path = "/getStudentData",
         .url = url,
@@ -173,13 +174,17 @@ esp_err_t getStudentsData(device_config_t dConfig)
 esp_err_t sendAttendance(device_config_t dConfig , char* attendance)
 {
     const char *auth = getAuthToken(&dConfig);
+    char url[70] = {0};
+
+    snprintf(url, sizeof(url), "http://%s:%s/api/attendancedumps/create", SERVER_ADDRESS , SERVER_PORT);
+
 
     esp_err_t err;
     esp_http_client_config_t config = {
-        .host = "192.168.50.209",
+        .host = SERVER_ADDRESS,
         // .host = "ade01b9d-fb0e-4117-a267-ff752ee8812d.mock.pstmn.io",
         // .path = "/sendAttendance",
-        .url = "http://192.168.50.209:8000/api/attendancedumps/create",
+        .url = url,
         .method = HTTP_METHOD_POST,
         .event_handler = _http_event_handler,
     };
@@ -187,6 +192,49 @@ esp_err_t sendAttendance(device_config_t dConfig , char* attendance)
     esp_http_client_set_header(client , "token" , auth);
     esp_http_client_set_header(client , "Content-Type" , "application/json");
     esp_http_client_set_post_field(client , attendance , strlen(attendance));
+    err = esp_http_client_perform(client);
+
+    if (err == ESP_OK)
+    {
+        int status_code = esp_http_client_get_status_code(client);
+
+        ESP_LOGI(HTTP_CLIENT_TAG, "HTTP GET Status = %d", status_code);
+        if (status_code == 200)
+        {
+            printf("status code : %d" , status_code);
+            
+        }
+    }
+    else
+    {
+        ESP_LOGE(HTTP_CLIENT_TAG, "HTTP GET request failed: %s", esp_err_to_name(err));
+
+        return ESP_FAIL;
+    }
+
+    return ESP_OK;
+}
+
+esp_err_t sendEnrollment(device_config_t dConfig , char* enrollment)
+{
+    const char *auth = getAuthToken(&dConfig);
+    char url[70] = {0};
+
+    snprintf(url, sizeof(url), "http://%s:%s/api/students/enrollment", SERVER_ADDRESS , SERVER_PORT);
+
+    esp_err_t err;
+    esp_http_client_config_t config = {
+        .host = SERVER_ADDRESS,
+        // .host = "ade01b9d-fb0e-4117-a267-ff752ee8812d.mock.pstmn.io",
+        // .path = "/sendAttendance",
+        .url = url,
+        .method = HTTP_METHOD_POST,
+        .event_handler = _http_event_handler,
+    };
+    esp_http_client_handle_t client = esp_http_client_init(&config);
+    esp_http_client_set_header(client , "token" , auth);
+    esp_http_client_set_header(client , "Content-Type" , "application/json");
+    esp_http_client_set_post_field(client , enrollment , strlen(enrollment));
     err = esp_http_client_perform(client);
 
     if (err == ESP_OK)

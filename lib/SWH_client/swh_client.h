@@ -14,5 +14,6 @@
 
 esp_err_t getStudentsData(device_config_t);
 esp_err_t sendAttendance(device_config_t , char* attendance);
+esp_err_t sendEnrollment(device_config_t , char* enrollment);
 
 #endif

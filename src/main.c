@@ -189,9 +189,12 @@ static void fingerprintTask(void* args){
                                     twoShortBeeps();
                                     mp_struct.f_id_st = atoi(temp_str);   // assign fingerid to mp_struct variable.
                                     opt_flag = 0; // reset to attendance.
-                                    ESP_LOGI(F_TAG , "temp_str: %s - f_id_st :%d" , temp_str , mp_struct.f_id_st);
+                                    ESP_LOGI(F_TAG , "vu_id: %s - f_id_st :%d - tamp_count: %d" , mp_struct.vu_id_st , mp_struct.f_id_st , mp_struct.tamp_count);
                                     
-
+                                    // char* enrollment = enrollmentToJson(mp_struct.vu_id_st , mp_struct.tamp_count);
+                                    // ESP_LOGI(F_TAG , "enrollment: %s" , enrollment);
+                                    // sendEnrollment(dConfig , enrollment);
+                                    // free(enrollment);
                                     xEventGroupSetBits(spiffs_event_group , CLIENT_RECIEVED_BIT);  // store the mapping.
                                 }
                                 count = 0;
@@ -245,8 +248,9 @@ static void fingerprintTask(void* args){
                         // printf("%04d-%02d-%02d %02d:%02d:%02d\n", mytime.tm_year + 1900 /*Add 1900 for better readability*/, mytime.tm_mon + 1,
                         // mytime.tm_mday, mytime.tm_hour, mytime.tm_min, mytime.tm_sec);
                         char* attendance = attendanceToJson(get_vu_id(&id_mapping , page_id));
-                        printf("%s page_id: %d" , attendance , page_id);
+                        ESP_LOGI(F_TAG , "%s page_id: %d" , attendance , page_id);
                         sendAttendance(dConfig , attendance);
+                        free(attendance);
                         disp_msg = FINGERPRINT_SUCCESS;  //notify when server mark attendance // fingerprint match. 
                         twoShortBeeps();                       
 
@@ -664,7 +668,7 @@ void app_main(void)
     //xEventGroupSetBits(spiffs_event_group , FLASH_FLUSHING_BIT);
     //Empty(default_address);   
     TempleteNum(default_address);
-    
+       
     // ESP_LOGI("str_html" , "%s" , new_html_files[2]);
 
 
