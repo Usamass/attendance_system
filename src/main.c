@@ -74,7 +74,8 @@ mapping_t id_mapping;
 mapping_strct mp_struct;
 uint8_t disp_msg = 0x00;
 uint8_t opt_flag;
-
+typedef enum {device_configs_read , device_configs_write} device_configs;
+device_configs dConfig_flag;
 
 i2c_dev_t dev;
 struct tm mytime;
@@ -135,6 +136,7 @@ static void takeImg(void* args){
             max_image = 0;
 
             if (confirmation_code == 0x00){
+                shortBeep();
                 xEventGroupSetBits(fingerprint_event , FINGERPRINT_DONE_EVENT_BIT);
             }
             
@@ -344,11 +346,19 @@ static void db_interface_task()
             }
         }
         else if ((requestBits & DEVICE_CONFIG_BIT) != 0){
-            // before sending it must convert it into json format.
             DataSource_t dataSrc = DEVICE_CONFIGS;
             spiffs_noti.data_scr = dataSrc;
-            spiffs_noti.flag_type = DEVICE_CONFIG_WRITE_FLAG;
-            spiffs_noti.data = serialize_it(&dConfig);
+            if (dConfig_flag == device_configs_read) {
+                spiffs_noti.flag_type = DEVICE_CONFIG_READ_FLAG;
+                spiffs_noti.data = NULL;
+
+            } else {
+                spiffs_noti.flag_type = DEVICE_CONFIG_WRITE_FLAG;
+                spiffs_noti.data = serialize_it(&dConfig);
+
+            }
+            // before sending it must convert it into json format.
+            
 
             mailBox_status = xQueueSend(spiffs_mailBox, &spiffs_noti, portMAX_DELAY);
             if (mailBox_status != pdPASS){
@@ -447,6 +457,43 @@ static void spiffs_task()
                         
                         
                     }
+                }
+                else {
+                   ESP_LOGI(TAG_exe, "Reading from deviceConfigs.txt file");
+                    FILE *f = fopen("/spiffs/deviceConfigs.txt", "r");
+                    if (f == NULL)
+                    {
+                        ESP_LOGE(TAG_exe, "Failed to open file for reading");
+                        return;
+                    }
+                    fseek(f, 0L, SEEK_END); // move file pointer to end of file
+                    long size = ftell(f);   // get file size
+                    fseek(f, 0L, SEEK_SET); // move file pointer back to beginning of file
+                    
+                    if (size <= 0)
+                    {
+                        ESP_LOGI(TAG_exe, "No data inside /spiffs/deviceConfigs.txt size = %lu\n" , size);
+                        fclose(f);
+                        disp_msg = DEVICE_CONFIGS_NOT_FOUND;
+                        //return;
+                    }
+                    else {
+                        char* config_data = (char *)malloc(size); // allocate memory for buffer
+                        size_t result = fread(config_data, 1, size, f); // read file into buffer
+                        if (result != size)
+                        {
+                            ESP_LOGI(TAG_exe, "Error reading file.\n");
+                            free(config_data);
+                            fclose(f);
+                            return;
+                        }
+
+                        fclose(f); // close the file
+
+                        ESP_LOGI(TAG_exe, "Read from file: '%s'", config_data);
+                        deserialize_configs(config_data , &dConfig);
+                        
+                    }    
                 }
             }
             else if (spiffs_noti.data_scr == LOAD_MAPPING) {
@@ -590,6 +637,7 @@ void app_main(void)
     ESP_ERROR_CHECK(i2cdev_init());  // initializing i2c driver for rtc module.
     memset(&dev, 0, sizeof(i2c_dev_t));
     ESP_ERROR_CHECK(ds1307_init_desc(&dev, 0, 21, 22));
+    dConfig_flag = device_configs_read;
     
     spiffs_event_group = xEventGroupCreate();
     xEventGroupClearBits(
@@ -663,6 +711,7 @@ void app_main(void)
     vTaskDelay(pdMS_TO_TICKS(100));
     /*Load mapping data from the flash*/
     xEventGroupSetBits(spiffs_event_group , LOAD_MAPPING_BIT); 
+    xEventGroupSetBits(spiffs_event_group , DEVICE_CONFIG_BIT); 
     /*Reading HTML files from the flash*/
     // xEventGroupSetBits(spiffs_event_group , HTML_FILE_BIT);
     //xEventGroupSetBits(spiffs_event_group , FLASH_FLUSHING_BIT);
@@ -857,6 +906,14 @@ static void guiTask(void *pvParameter) {
         else if ((msgbox_created == false) && (disp_msg == FINGERPRINT_ALREADY_THERE)) {
             time_lapse = count;
             mbox1 = create_msgbox(img1 ,"<-Fingerprint->" , "Fingerprint is already registered!");
+            msgbox_created = true;
+            disp_msg = 0x00;
+            printf("msg box created!\n");
+
+        }
+        else if ((msgbox_created == false) && (disp_msg == DEVICE_CONFIGS_NOT_FOUND)) {
+            time_lapse = count;
+            mbox1 = create_msgbox(img1 ,"<-Configuration->" , "This device is not configured yet!");
             msgbox_created = true;
             disp_msg = 0x00;
             printf("msg box created!\n");

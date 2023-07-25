@@ -8,7 +8,6 @@
 /* for serializing the data received */
 char* serialize_it(device_config_t* dConfig)
 {
-    char* device_config_buffer = (char*)malloc(MAX_DEVICE_CONFIG_BUFFER * sizeof(char));
     cJSON* root;
     root = cJSON_CreateObject();
 
@@ -17,17 +16,28 @@ char* serialize_it(device_config_t* dConfig)
     cJSON_AddStringToObject(root , "device_location" , dConfig->location_name);
     cJSON_AddNumberToObject(root , "location_id" , dConfig->location_id);
 
-    device_config_buffer = cJSON_Print(root);
+    char* device_config_buffer = cJSON_Print(root);
     cJSON_Delete(root);
 
 
     return device_config_buffer;
 }
 
-// char* deserialize_it()
-// {
+void deserialize_configs(char* config_data , device_config_t* dConfig)
+{
 
-// }
+    cJSON* root2 = cJSON_Parse(config_data);
+    if (cJSON_GetObjectItem(root2, "device_id")) {
+        dConfig->device_id = cJSON_GetObjectItem(root2,"device_id")->valuestring;
+    }
+    if (cJSON_GetObjectItem(root2, "auth_token")) {
+        dConfig->authToken = cJSON_GetObjectItem(root2,"auth_token")->valuestring;
+    }
+    if (cJSON_GetObjectItem(root2, "location_id")) {
+        dConfig->location_id = cJSON_GetObjectItem(root2,"location_id")->valuestring;
+    }
+
+}
 
 struct tm date_time_parser(char* date_str , char* time_str)
 {
