@@ -201,8 +201,12 @@ esp_err_t sendAttendance(device_config_t dConfig , char* attendance)
         ESP_LOGI(HTTP_CLIENT_TAG, "HTTP GET Status = %d", status_code);
         if (status_code == 200)
         {
-            printf("status code : %d" , status_code);
+            ESP_LOGI(HTTP_CLIENT_TAG , "status code : %d" , status_code);
             
+        }
+        else {
+            // send an error msg to the display.
+            disp_msg = SERVER_ERROR;
         }
     }
     else

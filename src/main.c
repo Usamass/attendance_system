@@ -53,6 +53,7 @@
 #define FINGERPRINT_INPUT_PIN 34
 #define FINGERPRINT_NOTI_DELAY 20
 #define GOT_F_ID 5
+#define TOUCH_TIME_MS 500
 
 
 // static const char *ETH_TAG = "SWH_eth_test";
@@ -63,17 +64,18 @@ QueueHandle_t spiffs_mailBox;
 extern device_config_t dConfig; // device ip and mac will be set on connect to network.
 extern uint16_t template_number;   // getting templete number from fingerprint library
 extern uint16_t page_id;
+extern uint8_t is_ethernet_connected;
 extern char loginPage[];
 extern char dashboard[];
 extern char enrollmentPage[];
 
-bool shared_bit_f = false;
 EventGroupHandle_t spiffs_event_group;
 EventGroupHandle_t fingerprint_event;
 mapping_t id_mapping;
 mapping_strct mp_struct;
 uint8_t disp_msg = 0x00;
 uint8_t opt_flag;
+uint16_t prev_touch_time = 0;
 typedef enum {device_configs_read , device_configs_write} device_configs;
 device_configs dConfig_flag;
 
@@ -111,9 +113,15 @@ char default_password[4] = {0x00, 0x00, 0x00, 0x00};        //++ Default Module 
 
 // fingerprint touch sensor event handlar (external event)
 static void IRAM_ATTR fingerprint_handler(void* args){
+
+    uint16_t new_touch_time = esp_timer_get_time()/1000;
+    if ((new_touch_time - prev_touch_time) > 500) {
+        xEventGroupSetBits(fingerprint_event , FINGERPRINT_IMG_EVENT_BIT);
+
+    }
+    prev_touch_time = new_touch_time;
+
     
-    xEventGroupSetBits(fingerprint_event , FINGERPRINT_IMG_EVENT_BIT);
-    shared_bit_f ^= shared_bit_f;
     
 
 }
@@ -249,12 +257,17 @@ static void fingerprintTask(void* args){
                         // ds1307_get_time(&dev, &mytime);
                         // printf("%04d-%02d-%02d %02d:%02d:%02d\n", mytime.tm_year + 1900 /*Add 1900 for better readability*/, mytime.tm_mon + 1,
                         // mytime.tm_mday, mytime.tm_hour, mytime.tm_min, mytime.tm_sec);
-                        char* attendance = attendanceToJson(get_vu_id(&id_mapping , page_id));
-                        ESP_LOGI(F_TAG , "%s page_id: %d" , attendance , page_id);
-                        sendAttendance(dConfig , attendance);
-                        free(attendance);
-                        disp_msg = FINGERPRINT_SUCCESS;  //notify when server mark attendance // fingerprint match. 
-                        twoShortBeeps();                       
+                        if (is_ethernet_connected) {
+                            char* attendance = attendanceToJson(get_vu_id(&id_mapping , page_id));
+                            ESP_LOGI(F_TAG , "%s page_id: %d" , attendance , page_id);
+                            sendAttendance(dConfig , attendance);
+                            twoShortBeeps(); 
+                            free(attendance);
+                            disp_msg = FINGERPRINT_SUCCESS;
+
+                        }
+                        else disp_msg = ETHERNET_DISCONNECT_FLAG; 
+                                              
 
                     }
                     else {
@@ -914,6 +927,14 @@ static void guiTask(void *pvParameter) {
         else if ((msgbox_created == false) && (disp_msg == DEVICE_CONFIGS_NOT_FOUND)) {
             time_lapse = count;
             mbox1 = create_msgbox(img1 ,"<-Configuration->" , "This device is not configured yet!");
+            msgbox_created = true;
+            disp_msg = 0x00;
+            printf("msg box created!\n");
+
+        }
+        else if ((msgbox_created == false) && (disp_msg == SERVER_ERROR)) {
+            time_lapse = count;
+            mbox1 = create_msgbox(img1 ,"<-Server Error->" , "HTTP request failed");
             msgbox_created = true;
             disp_msg = 0x00;
             printf("msg box created!\n");

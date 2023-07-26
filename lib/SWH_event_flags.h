@@ -9,6 +9,7 @@
 #define HTML_FILE_READ (0x15)
 #define HTML_FILE_WRITE (0x16)
 #define DEVICE_CONFIGS_NOT_FOUND (0x17)
+#define SERVER_ERROR (0x18)
 
 // Fingerprint flags
 #define FINGERPRINT_SUCCESS 0x01

@@ -19,6 +19,7 @@
 EventGroupHandle_t swh_ethernet_event_group;
 esp_eth_handle_t eth_handle;
 device_config_t dConfig;    // dConfig defined here first.
+uint8_t is_ethernet_connected = false;
 
 static char* ETH_TAG = "SWH_ethernet";
 /** Event handler for Ethernet events */
@@ -31,16 +32,18 @@ static void eth_event_handler(void *arg, esp_event_base_t event_base,
 
     switch (event_id) {
     case ETHERNET_EVENT_CONNECTED:
+        is_ethernet_connected = true;
         xEventGroupSetBits(swh_ethernet_event_group , ETHERNET_CONNECTED_BIT);
         setRGBLED(1 , 1 , 0);
         esp_eth_ioctl(eth_handle, ETH_CMD_G_MAC_ADDR, mac_addr);
-        ESP_LOGI(ETH_TAG, "Ethernet Link Up");
+        ESP_LOGI(ETH_TAG, "Ethernet Link Up: %d" , is_ethernet_connected);
         ESP_LOGI(ETH_TAG, "Ethernet HW Addr %02x:%02x:%02x:%02x:%02x:%02x",
                  mac_addr[0], mac_addr[1], mac_addr[2], mac_addr[3], mac_addr[4], mac_addr[5]);
         setMacAddr(&dConfig , mac_addr);
         break;
     case ETHERNET_EVENT_DISCONNECTED:
-        ESP_LOGI(ETH_TAG, "Ethernet Link Down");
+        is_ethernet_connected = false;
+        ESP_LOGI(ETH_TAG, "Ethernet Link Down: %d" , is_ethernet_connected);
         xEventGroupSetBits(swh_ethernet_event_group , ETHERNET_DISCONNECT_BIT);
         setRGBLED(0 , 1 , 1);
         break;

@@ -7,6 +7,8 @@
 #include "../SWH_eventGroups.h"
 #include "device_configs.h"
 #include "../SWH_data_buffers.h"
+#include "../SWH_event_flags.h"
+extern uint8_t disp_msg;
 
 #define EXAMPLE_ESP_MAXIMUM_RETRY (5)
 #define EXAMPLE_HTTP_QUERY_KEY_MAX_LEN (64)
