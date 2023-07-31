@@ -33,7 +33,7 @@ char ipstr[INET6_ADDRSTRLEN];
 static char* HTTP_SERVER_TAG = "server tag";
 static char* JSON_TAG = "json tag";
 static bool login_flag = false;
-#define MIN(a,b) (((a)<(b))?(a):(b))
+// #define MIN(a,b) (((a)<(b))?(a):(b))
 
 esp_err_t login_page(httpd_req_t *req)
 {
@@ -192,13 +192,14 @@ esp_err_t get_network(httpd_req_t *req)
 
 esp_err_t get_device_configs(httpd_req_t* req)
 {
+    
     shortBeep();
     char buf[200];
     cJSON* root2 = NULL;
 
     char* device_id = NULL;
     char* auth_token = NULL;
-    char* device_location = NULL;
+    char* server_address = NULL;
     char* location_id = NULL;
     int response = 0;
 
@@ -224,20 +225,22 @@ esp_err_t get_device_configs(httpd_req_t* req)
             auth_token = cJSON_GetObjectItem(root2,"auth_token")->valuestring;
             ESP_LOGI(JSON_TAG, "auth_token=%s",auth_token);
         }
-        if (cJSON_GetObjectItem(root2, "device_location")) {
-            device_location = cJSON_GetObjectItem(root2,"device_location")->valuestring;
-            ESP_LOGI(JSON_TAG, "device_location=%s",device_location);
+        if (cJSON_GetObjectItem(root2, "server_address")) {
+            server_address = cJSON_GetObjectItem(root2,"server_address")->valuestring;
+            ESP_LOGI(JSON_TAG, "server_address=%s",server_address);
         }
         if (cJSON_GetObjectItem(root2, "location_id")) {
             location_id = cJSON_GetObjectItem(root2,"location_id")->valuestring;
             ESP_LOGI(JSON_TAG, "location_id=%s",location_id);
         }
+        deviceConfigDestroy(&dConfig);
         /* setting all the parameters of device configs*/
         setDeviceId(&dConfig , device_id);
         setAuthToken(&dConfig , auth_token);
-        setDeviceLocation(&dConfig , device_location);
+        setDeviceLocation(&dConfig , server_address);
         setLocationId(&dConfig , atoi(location_id));
-
+        
+        dConfig_flag = device_configs_write;
         xEventGroupSetBits(spiffs_event_group , DEVICE_CONFIG_BIT); 
         response = httpd_resp_send(req , NULL , 0);
 
@@ -295,6 +298,7 @@ esp_err_t get_std_data(httpd_req_t* req)
     int response;
     getStudentsData(dConfig);   
     response = httpd_resp_send(req , client_receive_buffer , HTTPD_RESP_USE_STRLEN);
+    // need to free(client_receive_buffer);
     return response;
     
 }

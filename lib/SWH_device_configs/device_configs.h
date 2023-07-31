@@ -16,7 +16,7 @@ typedef struct
     char* MAC_addr;
     char* IP_addr;
     int   location_id;
-    char* location_name;
+    char* server_address;
     // if authentication token accquired.
     char *authToken;
 

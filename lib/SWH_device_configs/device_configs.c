@@ -42,10 +42,10 @@ int getLocationId(device_config_t* dConfig)
 
 void setDeviceLocation(device_config_t* dConfig , const char* l_name)
 {
-    int l_name_len = strlen(l_name);
+    int server_address_len = strlen(l_name);
 
-    dConfig->location_name = (char*)malloc(l_name_len * sizeof(char));
-    memcpy(dConfig->location_name , l_name , l_name_len +1);}
+    dConfig->server_address = (char*)malloc(server_address_len * sizeof(char));
+    memcpy(dConfig->server_address , l_name , server_address_len +1);}
 
 void setAuthToken(device_config_t* dConfig , const char* token)
 {
@@ -102,7 +102,7 @@ void deviceConfigDestroy(device_config_t* dConfig)
     free(dConfig->authToken);
     free(dConfig->MAC_addr);
     free(dConfig->IP_addr);
-    free(dConfig->location_name);
+    free(dConfig->server_address);
     free(dConfig->device_id);
 }
 

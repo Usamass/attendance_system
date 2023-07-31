@@ -1,14 +1,15 @@
 #include "swh_client.h"
-// #include SERVER_ADDRESS SERVER_ADDRESS
+
 char* client_receive_buffer = NULL;
 int content_len = 0;
+static int output_len;      // Stores number of bytes read
+
 
 static const char *HTTP_CLIENT_TAG = "http client";
 
 esp_err_t _http_event_handler(esp_http_client_event_t *evt)
 {
     static char *output_buffer; // Buffer to store response of http request from event handler
-    static int output_len;      // Stores number of bytes read
     switch (evt->event_id)
     {
     case HTTP_EVENT_ERROR:
@@ -24,15 +25,16 @@ esp_err_t _http_event_handler(esp_http_client_event_t *evt)
         ESP_LOGI(HTTP_CLIENT_TAG, "HTTP_EVENT_ON_HEADER, key=%s, value=%s", evt->header_key, evt->header_value);
         break;
     case HTTP_EVENT_ON_DATA:
-        content_len = evt->data_len;
-        // ESP_LOGI(HTTP_CLIENT_TAG, "HTTP_EVENT_ON_DATA, len=%d", evt->data_len);
-        // ESP_LOGI(HTTP_CLIENT_TAG, "HTTP_RESPONSE_DATA: %s \n", (char *)evt->data);
+        content_len += evt->data_len;
+        ESP_LOGI(HTTP_CLIENT_TAG, "HTTP_EVENT_ON_DATA, len=%d", evt->data_len);
+        ESP_LOGI(HTTP_CLIENT_TAG, "HTTP_RESPONSE_DATA: %s \n", (char *)evt->data);
         /*
          *  Check for chunked encoding is added as the URL for chunked encoding used in this example returns binary data.
-         *  However, event handler can also be used in case chunked encoding is used.
-         */
+        */
         if (!esp_http_client_is_chunked_response(evt->client))
         {
+            ESP_LOGI(HTTP_CLIENT_TAG , "The response is not in chunked encoding!\n");
+
             
             // If user_data buffer is configured, copy the response into the buffer
             int copy_len = 0;
@@ -43,6 +45,7 @@ esp_err_t _http_event_handler(esp_http_client_event_t *evt)
                 if (copy_len)
                 {
                     memcpy(evt->user_data + output_len, evt->data, copy_len);
+                    ESP_LOGI(HTTP_CLIENT_TAG , "user_data: %s" , (char*)evt->user_data);
                 }
             }
             else
@@ -69,19 +72,21 @@ esp_err_t _http_event_handler(esp_http_client_event_t *evt)
             output_len += copy_len;
         }
         else {
-            if (evt->user_data) {
-                int copy_len = 0;
-                if (evt->user_data)
-                {
-                    
-                    copy_len = MIN(evt->data_len, (MAX_HTTP_OUTPUT_BUFFER - output_len));
-                    if (copy_len)
-                    {
-                        memcpy(evt->user_data + output_len, evt->data, copy_len);
-                    }
+            ESP_LOGI(HTTP_CLIENT_TAG , "data: %d \n" , output_len);
+            int copy_len = 0;
 
+            if (evt->user_data)
+            {
+                
+                copy_len = MIN(evt->data_len, (MAX_HTTP_OUTPUT_BUFFER - output_len));
+                if (copy_len)
+                {
+                    memcpy(evt->user_data + output_len, evt->data, copy_len);
                 }
+
             }
+            
+            output_len += copy_len;
 
         }
 
@@ -125,11 +130,11 @@ esp_err_t getStudentsData(device_config_t dConfig)
 
    // client_receive_buffer[MAX_HTTP_OUTPUT_BUFFER];
     client_receive_buffer = (char *)malloc(MAX_HTTP_OUTPUT_BUFFER * sizeof(char));
-    char url[70] = {0};
+    char url[200] = {0};
 
     esp_err_t err;
     
-    snprintf(url, sizeof(url), "http://%s:%s/api/students/location/%d", SERVER_ADDRESS, SERVER_PORT , locationID);
+    snprintf(url, sizeof(url), "http://%s/students/location/%d", dConfig.server_address, locationID);
 
     esp_http_client_config_t config = {
         .host = SERVER_ADDRESS,
@@ -174,10 +179,10 @@ esp_err_t getStudentsData(device_config_t dConfig)
 esp_err_t sendAttendance(device_config_t dConfig , char* attendance)
 {
     const char *auth = getAuthToken(&dConfig);
-    char url[70] = {0};
+    char url[200] = {0};
 
-    snprintf(url, sizeof(url), "http://%s:%s/api/attendancedumps/create", SERVER_ADDRESS , SERVER_PORT);
-
+    snprintf(url, sizeof(url), "http://%s/attendancedumps/create", dConfig.server_address);
+    ESP_LOGI(HTTP_CLIENT_TAG , "URL: %s" , url);
 
     esp_err_t err;
     esp_http_client_config_t config = {
@@ -204,13 +209,12 @@ esp_err_t sendAttendance(device_config_t dConfig , char* attendance)
             ESP_LOGI(HTTP_CLIENT_TAG , "status code : %d" , status_code);
             
         }
-        else {
-            // send an error msg to the display.
-            disp_msg = SERVER_ERROR;
-        }
+       
     }
     else
     {
+         // send an error msg to the display.
+        disp_msg = SERVER_ERROR;
         ESP_LOGE(HTTP_CLIENT_TAG, "HTTP GET request failed: %s", esp_err_to_name(err));
 
         return ESP_FAIL;
@@ -222,9 +226,9 @@ esp_err_t sendAttendance(device_config_t dConfig , char* attendance)
 esp_err_t sendEnrollment(device_config_t dConfig , char* enrollment)
 {
     const char *auth = getAuthToken(&dConfig);
-    char url[70] = {0};
+    char url[200] = {0};
 
-    snprintf(url, sizeof(url), "http://%s:%s/api/students/enrollment", SERVER_ADDRESS , SERVER_PORT);
+    snprintf(url, sizeof(url), "http://%s/students/enrollment", dConfig.server_address);
 
     esp_err_t err;
     esp_http_client_config_t config = {

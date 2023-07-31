@@ -7,6 +7,7 @@
 #include "../mapping_table/mapping_table.h"
 #define MAX_HTTP_OUTPUT_BUFFER (1000)
 
+typedef enum {device_configs_read , device_configs_write} device_configs;
 extern char* client_receive_buffer;
 extern mapping_strct mp_struct;
 extern mapping_t id_mapping;
@@ -16,4 +17,5 @@ extern uint8_t disp_msg;
 extern uint8_t opt_flag;
 extern char* vu_id;
 extern const char* new_html_files[3];
+extern device_configs dConfig_flag;
 #endif /*_DATA_BUFFER_H*/

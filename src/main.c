@@ -76,7 +76,6 @@ mapping_strct mp_struct;
 uint8_t disp_msg = 0x00;
 uint8_t opt_flag;
 uint16_t prev_touch_time = 0;
-typedef enum {device_configs_read , device_configs_write} device_configs;
 device_configs dConfig_flag;
 
 i2c_dev_t dev;
@@ -201,10 +200,10 @@ static void fingerprintTask(void* args){
                                     opt_flag = 0; // reset to attendance.
                                     ESP_LOGI(F_TAG , "vu_id: %s - f_id_st :%d - tamp_count: %d" , mp_struct.vu_id_st , mp_struct.f_id_st , mp_struct.tamp_count);
                                     
-                                    // char* enrollment = enrollmentToJson(mp_struct.vu_id_st , mp_struct.tamp_count);
-                                    // ESP_LOGI(F_TAG , "enrollment: %s" , enrollment);
-                                    // sendEnrollment(dConfig , enrollment);
-                                    // free(enrollment);
+                                    char* enrollment = enrollmentToJson(mp_struct.vu_id_st , mp_struct.tamp_count);
+                                    ESP_LOGI(F_TAG , "enrollment: %s" , enrollment);
+                                    sendEnrollment(dConfig , enrollment);
+                                    free(enrollment);
                                     xEventGroupSetBits(spiffs_event_group , CLIENT_RECIEVED_BIT);  // store the mapping.
                                 }
                                 count = 0;
@@ -434,7 +433,7 @@ static void spiffs_task()
                 {
                     if (spiffs_noti.data != NULL)
                     {
-                        ESP_LOGI(TAG_exe, "Opening stdData.txt file");
+                        ESP_LOGI(TAG_exe, "Opening stdData.txt file" );
                         FILE *f = fopen("/spiffs/stdData.txt", "w");
                         if (f == NULL)
                         {
@@ -467,6 +466,9 @@ static void spiffs_task()
                         free(spiffs_noti.data);
                         ESP_LOGI(TAG_exe, "File written");
                         // task that is waiting for the spiffs operation to be done will be signaled
+                        dConfig_flag = device_configs_read;
+                        xEventGroupSetBits(spiffs_event_group , DEVICE_CONFIG_BIT); 
+
                         
                         
                     }
@@ -724,6 +726,7 @@ void app_main(void)
     vTaskDelay(pdMS_TO_TICKS(100));
     /*Load mapping data from the flash*/
     xEventGroupSetBits(spiffs_event_group , LOAD_MAPPING_BIT); 
+    /*Load device configurations from the flash*/
     xEventGroupSetBits(spiffs_event_group , DEVICE_CONFIG_BIT); 
     /*Reading HTML files from the flash*/
     // xEventGroupSetBits(spiffs_event_group , HTML_FILE_BIT);

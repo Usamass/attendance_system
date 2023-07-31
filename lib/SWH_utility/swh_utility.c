@@ -13,7 +13,7 @@ char* serialize_it(device_config_t* dConfig)
 
     cJSON_AddStringToObject(root , "device_id" , dConfig->device_id);
     cJSON_AddStringToObject(root , "auth_token" , dConfig->authToken);
-    cJSON_AddStringToObject(root , "device_location" , dConfig->location_name);
+    cJSON_AddStringToObject(root , "server_address" , dConfig->server_address);
     cJSON_AddNumberToObject(root , "location_id" , dConfig->location_id);
 
     char* device_config_buffer = cJSON_Print(root);
@@ -33,8 +33,11 @@ void deserialize_configs(char* config_data , device_config_t* dConfig)
     if (cJSON_GetObjectItem(root2, "auth_token")) {
         dConfig->authToken = cJSON_GetObjectItem(root2,"auth_token")->valuestring;
     }
+    if (cJSON_GetObjectItem(root2, "server_address")) {
+        dConfig->server_address = cJSON_GetObjectItem(root2,"server_address")->valuestring;
+    }
     if (cJSON_GetObjectItem(root2, "location_id")) {
-        dConfig->location_id = cJSON_GetObjectItem(root2,"location_id")->valuestring;
+        dConfig->location_id = cJSON_GetObjectItem(root2,"location_id")->valueint;
     }
 
 }
