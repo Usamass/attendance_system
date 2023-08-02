@@ -5,7 +5,7 @@
 #include <ds1307.h>
 #include "SWH_custom_data_structs.h"
 #include "../mapping_table/mapping_table.h"
-#define MAX_HTTP_OUTPUT_BUFFER (1000)
+#define MAX_HTTP_OUTPUT_BUFFER (2000)
 
 typedef enum {device_configs_read , device_configs_write} device_configs;
 extern char* client_receive_buffer;

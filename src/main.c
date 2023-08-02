@@ -80,6 +80,7 @@ device_configs dConfig_flag;
 
 i2c_dev_t dev;
 struct tm mytime;
+static bool resource_mutex = false;
   
 // #define EXAMPLE_ESP_MAXIMUM_RETRY (5)
 // #define EXAMPLE_HTTP_QUERY_KEY_MAX_LEN (64)
@@ -114,7 +115,7 @@ char default_password[4] = {0x00, 0x00, 0x00, 0x00};        //++ Default Module 
 static void IRAM_ATTR fingerprint_handler(void* args){
 
     uint16_t new_touch_time = esp_timer_get_time()/1000;
-    if ((new_touch_time - prev_touch_time) > 500) {
+if (((new_touch_time - prev_touch_time) > 1000) && (resource_mutex == false)) {
         xEventGroupSetBits(fingerprint_event , FINGERPRINT_IMG_EVENT_BIT);
 
     }
@@ -144,6 +145,7 @@ static void takeImg(void* args){
 
             if (confirmation_code == 0x00){
                 shortBeep();
+                resource_mutex = true;
                 xEventGroupSetBits(fingerprint_event , FINGERPRINT_DONE_EVENT_BIT);
             }
             
@@ -209,7 +211,7 @@ static void fingerprintTask(void* args){
                                 count = 0;
                             }
                             else {
-                                count = 0;
+                                count = 0;                                
                                 disp_msg = FINGERPRINT_ENROLL_ERROR;
                                 threeShortBeeps();
                                 free(mp_struct.vu_id_st);
@@ -217,7 +219,7 @@ static void fingerprintTask(void* args){
                         }
                         else {
                             confirmation_code = Search(default_address , "1" , "1" , temp_str);
-                            if (confirmation_code == 0x00){
+                            if (confirmation_code == 0x00){                                
                                 disp_msg = FINGERPRINT_ALREADY_THERE;
                                 ESP_LOGI(F_TAG , "Fingerprint is already registered!\n");
                                 count = 0;
@@ -232,7 +234,7 @@ static void fingerprintTask(void* args){
                         }
                     }
                     else {
-                        count = 0;
+                        count = 0;                        
                         disp_msg = FINGERPRINT_ENROLL_ERROR;
                         threeShortBeeps();
                         free(mp_struct.vu_id_st);
@@ -261,7 +263,7 @@ static void fingerprintTask(void* args){
                             ESP_LOGI(F_TAG , "%s page_id: %d" , attendance , page_id);
                             sendAttendance(dConfig , attendance);
                             twoShortBeeps(); 
-                            free(attendance);
+                            free(attendance);                            
                             disp_msg = FINGERPRINT_SUCCESS;
 
                         }
@@ -270,7 +272,7 @@ static void fingerprintTask(void* args){
 
                     }
                     else {
-                        threeShortBeeps();
+                        threeShortBeeps();    
                         disp_msg = FINGERPRINT_NOT_MACHING;  // no fingerprint matches
                     }
                     
@@ -680,7 +682,7 @@ void app_main(void)
 
     xTaskCreatePinnedToCore(takeImg, "img task", 4096, NULL, 2, NULL , 0);
     xTaskCreatePinnedToCore(fingerprintTask, "fingerprint task", 4096, NULL, 1, NULL , 0);
-    xTaskCreatePinnedToCore(networkStatusTask, "network status task", 4000, NULL, 1, NULL , 0);
+    xTaskCreatePinnedToCore(networkStatusTask, "network status task", 4000, NULL, 1, NULL , 0);    
     // mailBox = xQueueCreate(1, sizeof(NOTIFIER)); // creating mailbox with 1 NOTIFIER space.
 
     // if (mailBox != NULL)
@@ -713,24 +715,24 @@ void app_main(void)
 
     if (confirmation_code == 0x00)
     {
-        printf("R307 FINGERPRINT MODULE DETECTED\n");
+        ESP_LOGI(F_TAG ,"R307 FINGERPRINT MODULE DETECTED\n");
     }
 
     confirmation_code = ReadSysPara(default_address);
 
     if (confirmation_code == 0x00)
     {
-        printf("R307 System Parameter Read!\n");
+        ESP_LOGI(F_TAG , "R307 System Parameter Read!\n");
     }
    
     vTaskDelay(pdMS_TO_TICKS(100));
+    // xEventGroupSetBits(spiffs_event_group , FLASH_FLUSHING_BIT);
     /*Load mapping data from the flash*/
     xEventGroupSetBits(spiffs_event_group , LOAD_MAPPING_BIT); 
     /*Load device configurations from the flash*/
     xEventGroupSetBits(spiffs_event_group , DEVICE_CONFIG_BIT); 
     /*Reading HTML files from the flash*/
     // xEventGroupSetBits(spiffs_event_group , HTML_FILE_BIT);
-    //xEventGroupSetBits(spiffs_event_group , FLASH_FLUSHING_BIT);
     //Empty(default_address);   
     TempleteNum(default_address);
        
@@ -827,7 +829,7 @@ static void guiTask(void *pvParameter) {
             msgbox_created = true;
             img_created = true;
             disp_msg = 0x00;
-            printf("msg box created!\n");
+            // printf("msg box created!\n");
         }
         else if ((msgbox_created == false) &&  (disp_msg == FINGERPRINT_NOT_MACHING)) {
             time_lapse = count;
@@ -837,7 +839,7 @@ static void guiTask(void *pvParameter) {
             msgbox_created = true;
             img_created = true;
             disp_msg = 0x00;
-            printf("msg box created!\n");
+            // printf("msg box created!\n");
 
         }
         else if ((msgbox_created == false) && (disp_msg == FINGERPRINT_RELEASE_MSG)) {
@@ -845,7 +847,7 @@ static void guiTask(void *pvParameter) {
             mbox1 = create_msgbox(img1 ,"<-Fingerprint->" , "Please Release the finger!");
             msgbox_created = true;
             disp_msg = 0x00;
-            printf("msg box created!\n");
+            // printf("msg box created!\n");
 
 
         }
@@ -857,7 +859,7 @@ static void guiTask(void *pvParameter) {
             msgbox_created = true;
             img_created = true;
             disp_msg = 0x00;
-            printf("msg box created!\n");
+            // printf("msg box created!\n");
 
         }
         else if ((msgbox_created == false) && (disp_msg == FINGERPRINT_SENCOND_PRINT)) {
@@ -865,7 +867,7 @@ static void guiTask(void *pvParameter) {
             mbox1 = create_msgbox(img1 ,"<-Fingerprint->" , "Please put the same finger on the sensor.");
             msgbox_created = true;
             disp_msg = 0x00;
-            printf("msg box created!\n");
+            // printf("msg box created!\n");
 
         }
         else if ((msgbox_created == false) && (disp_msg == FINGERPRINT_STORE_SUCCESS)) {
@@ -875,7 +877,7 @@ static void guiTask(void *pvParameter) {
             img_created = true;
             msgbox_created = true;
             disp_msg = 0x00;
-            printf("msg box created!\n");
+            // printf("msg box created!\n");
 
         }
         else if ((msgbox_created == false) && (disp_msg == FINGERPRINT_ENROLL_CODE)) {
@@ -884,7 +886,7 @@ static void guiTask(void *pvParameter) {
             msgbox_created = true;
             disp_msg = 0x00;
             //opt_flag = 0; // reset the flage to attendance
-            printf("msg box created!\n");
+            // printf("msg box created!\n");
 
         }
         else if ((msgbox_created == false) && (disp_msg == FINGERPRINT_MAX_TAMP)) {
@@ -892,7 +894,7 @@ static void guiTask(void *pvParameter) {
             mbox1 = create_msgbox(img1 ,"<-Fingerprint->" , "Max Tamplate count is already achieved!");
             msgbox_created = true;
             disp_msg = 0x00;
-            printf("msg box created!\n");
+            // printf("msg box created!\n");
 
         }
         else if ((msgbox_created == false) && (disp_msg == ETHERNET_CONNECT_FLAG)) {
@@ -900,7 +902,7 @@ static void guiTask(void *pvParameter) {
             mbox1 = create_msgbox(img1 ,"<-Ethernet->" , "Ethernet connected!");
             msgbox_created = true;
             disp_msg = 0x00;
-            printf("msg box created!\n");
+            // printf("msg box created!\n");
 
         }
         else if ((msgbox_created == false) && (disp_msg == ETHERNET_DISCONNECT_FLAG)) {
@@ -908,7 +910,7 @@ static void guiTask(void *pvParameter) {
             mbox1 = create_msgbox(img1 ,"<-Ethernet->" , "Ethernet disconnected!");
             msgbox_created = true;
             disp_msg = 0x00;
-            printf("msg box created!\n");
+            // printf("msg box created!\n");
 
         }
         else if ((msgbox_created == false) && (disp_msg == GOT_IP_FLAG)) {
@@ -916,7 +918,7 @@ static void guiTask(void *pvParameter) {
             mbox1 = create_msgbox(img1 ,"<-IP Received->" , getIpAddr(&dConfig));
             msgbox_created = true;
             disp_msg = 0x00;
-            printf("msg box created!\n");
+            // printf("msg box created!\n");
 
         }
         else if ((msgbox_created == false) && (disp_msg == FINGERPRINT_ALREADY_THERE)) {
@@ -924,7 +926,7 @@ static void guiTask(void *pvParameter) {
             mbox1 = create_msgbox(img1 ,"<-Fingerprint->" , "Fingerprint is already registered!");
             msgbox_created = true;
             disp_msg = 0x00;
-            printf("msg box created!\n");
+            // printf("msg box created!\n");
 
         }
         else if ((msgbox_created == false) && (disp_msg == DEVICE_CONFIGS_NOT_FOUND)) {
@@ -932,7 +934,7 @@ static void guiTask(void *pvParameter) {
             mbox1 = create_msgbox(img1 ,"<-Configuration->" , "This device is not configured yet!");
             msgbox_created = true;
             disp_msg = 0x00;
-            printf("msg box created!\n");
+            // printf("msg box created!\n");
 
         }
         else if ((msgbox_created == false) && (disp_msg == SERVER_ERROR)) {
@@ -940,7 +942,7 @@ static void guiTask(void *pvParameter) {
             mbox1 = create_msgbox(img1 ,"<-Server Error->" , "HTTP request failed");
             msgbox_created = true;
             disp_msg = 0x00;
-            printf("msg box created!\n");
+            // printf("msg box created!\n");
 
         }
         
@@ -954,7 +956,9 @@ static void guiTask(void *pvParameter) {
             }
             
             msgbox_created = false;
-            printf("msg box deleted!\n");
+            resource_mutex = false;
+            
+            // printf("msg box deleted!\n");
         }
         if (disp_msg == FINGERPRINT_RELEASE_CODE && msgbox_created == true) {
             lv_obj_del(mbox1);
@@ -963,7 +967,10 @@ static void guiTask(void *pvParameter) {
                 img_created = false;
             }
             msgbox_created = false;
-            printf("msg box deleted!\n");
+            resource_mutex = false;
+
+            
+            // printf("msg box deleted!\n");
 
         }
         

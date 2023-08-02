@@ -4,8 +4,10 @@
 #include <string.h>
 #include "cJSON.h"
 #include "../SWH_custom_data_structs.h"
+#include "esp_log.h"
 
 #define ALLOC_SIZE 50
+#define MAPPING_TAG "mapping_tag"
 typedef struct {
     cJSON* root;
     char* mapping_arr;

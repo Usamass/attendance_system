@@ -171,6 +171,7 @@ esp_err_t getStudentsData(device_config_t dConfig)
         return ESP_FAIL;
     }
     ESP_LOG_BUFFER_HEX(HTTP_CLIENT_TAG, client_receive_buffer, strlen(client_receive_buffer));
+    esp_http_client_cleanup(client);
 
     return ESP_OK;
 }
@@ -219,6 +220,8 @@ esp_err_t sendAttendance(device_config_t dConfig , char* attendance)
 
         return ESP_FAIL;
     }
+    esp_http_client_cleanup(client);
+
 
     return ESP_OK;
 }
@@ -226,6 +229,7 @@ esp_err_t sendAttendance(device_config_t dConfig , char* attendance)
 esp_err_t sendEnrollment(device_config_t dConfig , char* enrollment)
 {
     const char *auth = getAuthToken(&dConfig);
+    // ESP_LOGI(HTTP_CLIENT_TAG , "%s" , auth);
     char url[200] = {0};
 
     snprintf(url, sizeof(url), "http://%s/students/enrollment", dConfig.server_address);
@@ -262,6 +266,8 @@ esp_err_t sendEnrollment(device_config_t dConfig , char* enrollment)
 
         return ESP_FAIL;
     }
+    esp_http_client_cleanup(client);
+
 
     return ESP_OK;
 }

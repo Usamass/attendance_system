@@ -293,11 +293,17 @@ esp_err_t enrollment_page(httpd_req_t* req)
 }
 esp_err_t get_std_data(httpd_req_t* req)
 {
+    
     shortBeep();
-    ESP_LOGI(HTTP_SERVER_TAG , "inside get std data handler!\n");
     int response;
-    getStudentsData(dConfig);   
-    response = httpd_resp_send(req , client_receive_buffer , HTTPD_RESP_USE_STRLEN);
+    getStudentsData(dConfig); 
+    cJSON* parsed_response = cJSON_Parse(client_receive_buffer);
+    char* convert = cJSON_Print(parsed_response);  
+    ESP_LOGI(HTTP_SERVER_TAG , "inside get std data handler!\n %s" , convert);
+
+    response = httpd_resp_send(req , convert , HTTPD_RESP_USE_STRLEN);
+    free(client_receive_buffer);
+    cJSON_Delete(parsed_response);
     // need to free(client_receive_buffer);
     return response;
     
