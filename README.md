@@ -13,7 +13,7 @@ git clone https://gitlab.com/wajishah786/esp32-attendance.git
 ```
 
 - Need to install platformio extension on visual studio code.
-<p align="center"><a href="https://code.visualstudio.com/download" target="_blank"></p>
+- https://code.visualstudio.com/download
 - Firstly we need to build the project.
 ```shell
 pio run
