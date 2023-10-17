@@ -111,7 +111,7 @@ char* attendanceToJson(char* vu_id)
     cJSON* first_object;
     first_object = cJSON_CreateObject();
 
-    cJSON_AddStringToObject(first_object , "student_id" , vu_id);
+    cJSON_AddStringToObject(first_object , "user_name" , vu_id);
     cJSON_AddStringToObject(first_object , "timestamp" , time_stamp);
 
     char* attendance = cJSON_Print(first_object);
@@ -127,7 +127,7 @@ char* enrollmentToJson(char* vu_id , int f_count)
     cJSON* first_object;
     first_object = cJSON_CreateObject();
 
-    cJSON_AddStringToObject(first_object , "student_vuid" , vu_id);
+    cJSON_AddStringToObject(first_object , "user_name" , vu_id);
     cJSON_AddNumberToObject(first_object , "finger_count" , f_count);
 
     char* enrollment = cJSON_Print(first_object);

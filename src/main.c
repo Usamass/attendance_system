@@ -115,7 +115,7 @@ char default_password[4] = {0x00, 0x00, 0x00, 0x00};        //++ Default Module 
 static void IRAM_ATTR fingerprint_handler(void* args){
 
     uint16_t new_touch_time = esp_timer_get_time()/1000;
-if (((new_touch_time - prev_touch_time) > 1000) && (resource_mutex == false)) {
+    if (((new_touch_time - prev_touch_time) > 1000) && (resource_mutex == false)) {
         xEventGroupSetBits(fingerprint_event , FINGERPRINT_IMG_EVENT_BIT);
 
     }
@@ -258,13 +258,13 @@ static void fingerprintTask(void* args){
                         // ds1307_get_time(&dev, &mytime);
                         // printf("%04d-%02d-%02d %02d:%02d:%02d\n", mytime.tm_year + 1900 /*Add 1900 for better readability*/, mytime.tm_mon + 1,
                         // mytime.tm_mday, mytime.tm_hour, mytime.tm_min, mytime.tm_sec);
-                        if (is_ethernet_connected) {
+                        if (is_ethernet_connected /*, && got_ip_address?*/) {
                             char* attendance = attendanceToJson(get_vu_id(&id_mapping , page_id));
                             ESP_LOGI(F_TAG , "%s page_id: %d" , attendance , page_id);
                             sendAttendance(dConfig , attendance);
                             twoShortBeeps(); 
-                            free(attendance);                            
-                            disp_msg = FINGERPRINT_SUCCESS;
+                            free(attendance);
+                                disp_msg = FINGERPRINT_SUCCESS;
 
                         }
                         else disp_msg = ETHERNET_DISCONNECT_FLAG; 
@@ -305,6 +305,9 @@ static void networkStatusTask(void *pvParameter)
             portMAX_DELAY);
         if ((connectBits & GOT_IP_BIT) != 0)
         {
+            swh_server_init();
+            // send got ip address msg to display
+            disp_msg = GOT_IP_FLAG;
             // initializing html webpages as ip address received.
             new_html_files[0] = str_replace(loginPage , "_IP" , getIpAddr(&dConfig));
             // ESP_LOGI("str_html" , "%s" , new_html_files[0]);
@@ -312,9 +315,6 @@ static void networkStatusTask(void *pvParameter)
             // ESP_LOGI("str_html" , "%s" , new_html_files[1]);
             new_html_files[2] = str_replace(enrollmentPage , "_IP" , getIpAddr(&dConfig));
             ESP_LOGI(HTTP_CLIENT_TAG, "initializting Server\n");
-            // send got ip address msg to display
-            swh_server_init();
-            disp_msg = GOT_IP_FLAG;
             shortBeep();
 
         }

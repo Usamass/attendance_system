@@ -210,11 +210,14 @@ esp_err_t sendAttendance(device_config_t dConfig , char* attendance)
             ESP_LOGI(HTTP_CLIENT_TAG , "status code : %d" , status_code);
             
         }
+        else {
+            disp_msg = SERVER_ERROR;
+        }
        
     }
     else
     {
-         // send an error msg to the display.
+        // send an error msg to the display.
         disp_msg = SERVER_ERROR;
         ESP_LOGE(HTTP_CLIENT_TAG, "HTTP GET request failed: %s", esp_err_to_name(err));
 
@@ -258,6 +261,9 @@ esp_err_t sendEnrollment(device_config_t dConfig , char* enrollment)
         {
             printf("status code : %d" , status_code);
             
+        }
+        else {
+            disp_msg = SERVER_ERROR;
         }
     }
     else

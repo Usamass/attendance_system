@@ -85,8 +85,6 @@ void swh_eth_init()
     ETHERNET_DISCONNECT_BIT | 
     GOT_IP_BIT);
 
-        printf("Event group handle in eth_lib: %p\n", swh_ethernet_event_group);
-
     // <--------------------------------------------------------- Ethernet hardware Configs-------------------------------------------------->
     ESP_ERROR_CHECK(gpio_install_isr_service(0));
     // Initialize TCP/IP network interface (should be called only once in application)

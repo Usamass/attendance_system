@@ -23,7 +23,9 @@
         "esp_freertos_hooks.h": "c",
         "memory_resource": "c",
         "sstream": "c",
-        "esp_timer.h": "c"
+        "esp_timer.h": "c",
+        "swh_file_system.h": "c",
+        "esp_eth_phy.h": "c"
     },
     "C_Cpp.errorSquiggles": "disabled"
 }
