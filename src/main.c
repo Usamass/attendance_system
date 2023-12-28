@@ -30,12 +30,12 @@
 #include "mapping_table.h"
 
 #include <lvgl.h>
-#include <lvgl_helpers.h>
-#include <vu_logo_1.c>
-#include <check.c>
-#include <remove.c>
-#include <art.c>
-#include <lv_font_montserrat_32.c>
+#include <lvgl_esp32_drivers/lvgl_helpers.h>
+#include <images/vu_logo_1.c>
+#include <images/check.c>
+#include <images/remove.c>
+#include <images/art.c>
+#include <fonts/lv_font_montserrat_32.c>
 #include "esp_timer.h"
 #include "driver/gpio.h"
 #include "driver/uart.h"
