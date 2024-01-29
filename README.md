@@ -9,7 +9,7 @@ SWH Bio-Matric Attendance System
 
 
 ```shell
-git clone https://gitlab.com/wajishah786/esp32-attendance.git
+git clone (https://github.com/Usamass/attendance_system)
 ```
 
 - Need to install platformio extension on visual studio code.
