@@ -25,7 +25,13 @@
         "sstream": "c",
         "esp_timer.h": "c",
         "swh_file_system.h": "c",
-        "esp_eth_phy.h": "c"
+        "esp_eth_phy.h": "c",
+        "swh_client.h": "c",
+        "event_bits.h": "c",
+        "ui.h": "c",
+        "lvgl.h": "c",
+        "sys_beeps.h": "c",
+        "control.h": "c"
     },
     "C_Cpp.errorSquiggles": "disabled"
 }
